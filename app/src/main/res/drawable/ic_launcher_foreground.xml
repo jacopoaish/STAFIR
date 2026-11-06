@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- cornice foto -->
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M34,36h40a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-40a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
+    <!-- montagne -->
+    <path android:fillColor="#FF4F46E5"
+        android:pathData="M33,71l14,-17 9,11 6,-7 13,13z" />
+    <!-- sole / scintilla AI -->
+    <path android:fillColor="#FFF59E0B"
+        android:pathData="M66,42l2.2,5.3 5.3,2.2 -5.3,2.2 -2.2,5.3 -2.2,-5.3 -5.3,-2.2 5.3,-2.2z" />
+</vector>
