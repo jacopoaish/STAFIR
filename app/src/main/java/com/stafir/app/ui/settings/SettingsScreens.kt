@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
@@ -137,7 +138,13 @@ private fun rememberResumeTick(): Int {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: GalleryViewModel, onBack: () -> Unit, onStats: () -> Unit, onBatteryGuide: () -> Unit) {
+fun SettingsScreen(
+    vm: GalleryViewModel,
+    onBack: () -> Unit,
+    onStats: () -> Unit,
+    onBatteryGuide: () -> Unit,
+    onQuality: () -> Unit,
+) {
     val ctx = LocalContext.current
     val app = ctx.applicationContext as StafirApp
     val settings = vm.settings
@@ -222,6 +229,13 @@ fun SettingsScreen(vm: GalleryViewModel, onBack: () -> Unit, onStats: () -> Unit
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Slider(value = s.minConfidence, onValueChange = { settings.setMinConfidence((it * 20).toInt() / 20f) }, valueRange = 0.4f..0.9f, steps = 9)
+
+            NavRow(
+                Icons.Filled.Science,
+                "Banco qualità",
+                "Misura precisione e velocità del riconoscimento sulle tue foto etichettate a mano",
+                onQuality,
+            )
 
             SectionTitle("Modelli in uso")
             ModelRow("Scene e oggetti", "Google ML Kit Image Labeling (incluso, 400+ categorie)", "CPU · TFLite/XNNPACK")

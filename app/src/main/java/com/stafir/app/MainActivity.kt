@@ -21,6 +21,7 @@ import com.stafir.app.ui.GalleryViewModel
 import com.stafir.app.ui.home.HomeScreen
 import com.stafir.app.ui.onboarding.OnboardingScreen
 import com.stafir.app.ui.settings.BatteryGuideScreen
+import com.stafir.app.ui.settings.QualityScreen
 import com.stafir.app.ui.settings.SettingsScreen
 import com.stafir.app.ui.settings.StatsScreen
 import com.stafir.app.ui.theme.StafirTheme
@@ -83,8 +84,10 @@ class MainActivity : ComponentActivity() {
                             onBack = { nav.popBackStack() },
                             onStats = { nav.navigate("stats") },
                             onBatteryGuide = { nav.navigate("battery") },
+                            onQuality = { nav.navigate("quality") },
                         )
                     }
+                    composable("quality") { QualityScreen(onBack = { nav.popBackStack() }) }
                     composable("stats") { StatsScreen(vm = gallery, onBack = { nav.popBackStack() }) }
                     composable("battery") { BatteryGuideScreen(vm = gallery, onBack = { nav.popBackStack() }) }
                 }

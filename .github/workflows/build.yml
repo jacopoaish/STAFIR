@@ -56,7 +56,8 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: "Stafir Fase 1 – build ${{ github.run_number }}"
-          prerelease: true
+          prerelease: false
+          make_latest: true
           target_commitish: ${{ github.sha }}
           body: |
             APK di prova della Fase 1 (ramo `${{ github.ref_name }}`, commit ${{ github.sha }}).

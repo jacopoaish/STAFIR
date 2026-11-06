@@ -86,6 +86,16 @@ object Vocabulary {
 
     fun conceptForWord(normalizedWord: String): Concept? = bySynonym[normalizedWord]
 
+    /** Categorie implicite: un cane è anche un animale, un selfie ritrae anche persone. */
+    private val implied: Map<String, Set<String>> = mapOf(
+        "dog" to setOf("animals"),
+        "cat" to setOf("animals"),
+        "selfie" to setOf("people"),
+    )
+
+    /** Aggiunge le categorie implicite (usato per le etichette fatte a mano del banco qualità). */
+    fun withImplied(ids: Set<String>): Set<String> = ids + ids.flatMap { implied[it].orEmpty() }
+
     fun conceptById(id: String): Concept? = concepts.firstOrNull { it.id == id }
 
     /** Concetti attivati da un insieme di etichette (per mostrare le categorie di una foto). */

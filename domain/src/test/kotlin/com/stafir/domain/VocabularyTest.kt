@@ -25,4 +25,9 @@ class VocabularyTest {
         assertEquals("spiaggia", Vocabulary.italianLabel("Beach"))
         assertEquals("unknownthing", Vocabulary.italianLabel("UnknownThing"))
     }
+
+    @Test fun impliedConcepts() {
+        assertEquals(setOf("dog", "animals"), Vocabulary.withImplied(setOf("dog")))
+        assertEquals(setOf("sea"), Vocabulary.withImplied(setOf("sea")))
+    }
 }

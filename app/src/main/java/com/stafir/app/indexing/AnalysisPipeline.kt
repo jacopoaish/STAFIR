@@ -29,23 +29,29 @@ class AnalysisPipeline(private val container: AppContainer) : AutoCloseable {
     private val scenes by lazy { MlKitSceneRecognizer(minConfidence = 0.4f) }
     private val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
 
+    val sceneModelName: String get() = scenes.displayName
+
+    /** Riconosce scene e oggetti in una foto (miniatura) o in alcuni fotogrammi chiave di un video. */
+    suspend fun recognize(m: MediaEntity, videos: Boolean): List<RecognizedLabel> {
+        val uri = m.contentUri()
+        val bitmaps: List<Bitmap> = if (m.isVideo) {
+            if (videos) frames.videoKeyframes(uri, m.durationMs).ifEmpty { listOf(frames.thumbnail(uri)) }
+            else emptyList()
+        } else {
+            listOf(frames.thumbnail(uri, 512))
+        }
+        return try {
+            mergeLabels(bitmaps.map { scenes.recognize(it) })
+        } finally {
+            bitmaps.forEach { it.recycle() }
+        }
+    }
+
     suspend fun analyze(m: MediaEntity, s: AppSettings.Values) {
         val uri = m.contentUri()
 
         // 1) Scene e oggetti
-        val labels: List<RecognizedLabel> = if (s.recognizeScenes) {
-            val bitmaps: List<Bitmap> = if (m.isVideo) {
-                if (s.recognizeVideos) frames.videoKeyframes(uri, m.durationMs).ifEmpty { listOf(frames.thumbnail(uri)) }
-                else emptyList()
-            } else {
-                listOf(frames.thumbnail(uri, 512))
-            }
-            try {
-                mergeLabels(bitmaps.map { scenes.recognize(it) })
-            } finally {
-                bitmaps.forEach { it.recycle() }
-            }
-        } else emptyList()
+        val labels: List<RecognizedLabel> = if (s.recognizeScenes) recognize(m, s.recognizeVideos) else emptyList()
 
         // 2) Luogo (GPS -> città/regione/paese, senza internet)
         var updated = m

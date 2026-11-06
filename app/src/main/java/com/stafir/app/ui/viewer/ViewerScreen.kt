@@ -34,7 +34,9 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,7 +65,9 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
+import com.stafir.app.StafirApp
 import com.stafir.app.ui.GalleryViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.stafir.app.ui.common.Format
 import com.stafir.app.ui.common.Thumb
 import com.stafir.core.db.MediaEntity
@@ -246,6 +250,10 @@ private fun InfoSheet(vm: GalleryViewModel, start: MediaEntity, onDismiss: () ->
                     )
                 }
             }
+            if (!m.isVideo) {
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                QualityBenchEditor(m.id, labels)
+            }
         }
     }
 }
@@ -255,5 +263,45 @@ private fun InfoLine(label: String, value: String) {
     Row(Modifier.padding(vertical = 3.dp)) {
         Text(label, Modifier.width(110.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, Modifier.weight(1f))
+    }
+}
+
+/** Etichettatura a mano per il banco qualità (misura la precisione del riconoscimento). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QualityBenchEditor(mediaId: Long, labels: List<MediaLabelEntity>) {
+    val ctx = LocalContext.current
+    val store = (ctx.applicationContext as StafirApp).container.quality
+    val samples by store.samples.collectAsStateWithLifecycle()
+    val saved = samples.firstOrNull { it.mediaId == mediaId }?.expected
+    var open by remember(mediaId) { mutableStateOf(false) }
+    var chosen by remember(mediaId, saved) { mutableStateOf(saved ?: emptySet()) }
+
+    if (!open) {
+        TextButton(onClick = { open = true }) {
+            Text(if (saved != null) "Banco qualità: modifica le etichette di questa foto" else "Banco qualità: aggiungi questa foto")
+        }
+        return
+    }
+    Text("Banco qualità", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Seleziona TUTTE le categorie presenti nella foto. Servono a misurare quanto è preciso il riconoscimento (Impostazioni → Avanzate).",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Vocabulary.concepts.forEach { c ->
+            FilterChip(
+                selected = c.id in chosen,
+                onClick = { chosen = if (c.id in chosen) chosen - c.id else chosen + c.id },
+                label = { Text("${c.emoji} ${c.italianName}") },
+            )
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Button(onClick = { store.put(mediaId, chosen); open = false }) { Text("Salva") }
+        TextButton(onClick = {
+            chosen = Vocabulary.conceptsForLabels(labels.filter { it.confidence >= 0.6f }.map { it.label }).map { it.id }.toSet()
+        }) { Text("Parti dal riconoscimento") }
+        if (saved != null) TextButton(onClick = { store.remove(mediaId); open = false }) { Text("Togli") }
     }
 }

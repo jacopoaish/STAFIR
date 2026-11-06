@@ -369,9 +369,9 @@ private fun Banner(text: String, action: String?, onAction: () -> Unit, onDismis
 private fun AnalysisCard(a: AnalysisUi, onNow: () -> Unit, onStop: () -> Unit, onDetails: () -> Unit) {
     AnimatedVisibility(visible = a.pending > 0 || a.running) {
         Card(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             onClick = onDetails,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         ) {
             Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 4.dp)) {
                 val title = when {

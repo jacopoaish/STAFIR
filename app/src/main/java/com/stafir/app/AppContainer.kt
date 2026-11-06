@@ -2,6 +2,7 @@ package com.stafir.app
 
 import android.content.Context
 import com.stafir.app.indexing.IndexScheduler
+import com.stafir.app.quality.QualityStore
 import com.stafir.core.db.StafirDatabase
 import com.stafir.core.geo.ItalianNames
 import com.stafir.core.geo.OfflineGeocoder
@@ -18,6 +19,7 @@ class AppContainer(val context: Context) {
     val mediaSync: MediaStoreSync by lazy { MediaStoreSync(context, database) }
     val geocoder: OfflineGeocoder by lazy { OfflineGeocoder(context) }
     val scheduler: IndexScheduler by lazy { IndexScheduler(context, settings) }
+    val quality: QualityStore by lazy { QualityStore(context) }
 
     /** Costruisce il parser con i luoghi presenti nell'archivio. */
     suspend fun buildParser(): ItalianQueryParser {
