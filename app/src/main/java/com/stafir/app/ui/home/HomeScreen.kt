@@ -113,7 +113,10 @@ import com.stafir.domain.MediaTypeFilter
 import com.stafir.domain.PlaceLevel
 import com.stafir.domain.Source
 import com.stafir.domain.Vocabulary
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.runtime.snapshotFlow
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,9 +145,21 @@ fun HomeScreen(
     BackHandler(enabled = selecting) { vm.clearSelection() }
     BackHandler(enabled = !selecting && (text.isNotEmpty() || !chips.isEmpty)) { vm.clearAll() }
 
-    // Torna in cima quando cambia la ricerca
+    // Torna in cima solo quando cambia davvero la ricerca (non al ritorno dal visualizzatore)
     val query by vm.currentQuery.collectAsStateWithLifecycle()
-    LaunchedEffect(query) { gridState.scrollToItem(0) }
+    LaunchedEffect(query) {
+        if (vm.lastScrolledQuery != null && vm.lastScrolledQuery != query) gridState.scrollToItem(0)
+        vm.lastScrolledQuery = query
+    }
+    // Al ritorno dal visualizzatore, mostra la foto vista per ultima se è fuori schermo
+    LaunchedEffect(Unit) {
+        val idx = vm.lastViewedIndex ?: return@LaunchedEffect
+        vm.lastViewedIndex = null
+        val visible = withTimeoutOrNull(1_500) {
+            snapshotFlow { gridState.layoutInfo.visibleItemsInfo.map { it.index } }.first { it.isNotEmpty() }
+        }
+        if (visible == null || idx !in visible.first()..visible.last()) gridState.scrollToItem(idx)
+    }
 
     val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {

@@ -65,6 +65,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Quanti file analizzare subito al primo avvio, anche senza carica. */
+private const val FIRST_RUN_LIMIT = 1500
+
 /** Procedura guidata in 3 schermate: accesso → cosa riconoscere → avvia. */
 @Composable
 fun OnboardingScreen(onFinished: () -> Unit) {
@@ -228,7 +231,8 @@ private fun StartStep(onFinished: () -> Unit) {
                 val etaSec = (n.photos / 25.0 + n.videos / 6.0).toLong()
                 Text(
                     "Il riconoscimento di tutto l'archivio richiederà ${Format.eta(etaSec)}. " +
-                        "Parto subito dalle foto più recenti, così puoi già provare la ricerca; il resto proseguirà quando il telefono è in carica.",
+                        "Parto subito dalle ${Format.count(FIRST_RUN_LIMIT)} foto più recenti, così puoi già provare la ricerca; " +
+                        "il resto proseguirà da solo quando il telefono è in carica.",
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
@@ -257,7 +261,7 @@ private fun StartStep(onFinished: () -> Unit) {
                 scope.launch {
                     c.settings.setOnboardingDone(true)
                     app.startWatching()
-                    c.scheduler.scheduleAnalysis(now = true)
+                    c.scheduler.scheduleAnalysis(now = true, limit = FIRST_RUN_LIMIT)
                     onFinished()
                 }
             },

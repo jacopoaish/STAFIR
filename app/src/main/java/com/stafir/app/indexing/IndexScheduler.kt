@@ -21,22 +21,37 @@ class IndexScheduler(private val context: Context, private val settings: AppSett
     /**
      * [now] = true: parte subito anche senza carica (tasto "Analizza ora").
      * Altrimenti rispetta l'impostazione "solo in carica".
+     * [limit] > 0: se il telefono non è in carica si ferma dopo quel numero di file
+     * e il resto prosegue quando il telefono è in carica (usato al primo avvio).
      */
-    fun scheduleAnalysis(now: Boolean) {
-        val constraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(true)
-            .setRequiresCharging(!now && settings.current.onlyWhileCharging)
-            .build()
-        val request = OneTimeWorkRequestBuilder<AnalysisWorker>()
-            .setConstraints(constraints)
-            .addTag(TAG_ANALYSIS)
-            .build()
+    fun scheduleAnalysis(now: Boolean, limit: Int = 0) {
         wm.enqueueUniqueWork(
             UNIQUE_ANALYSIS,
             if (now) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
-            request,
+            request(requiresCharging = !now && settings.current.onlyWhileCharging, limit = limit),
         )
     }
+
+    /** Chiamato dal worker che ha raggiunto il limite: il resto riparte quando c'è la carica. */
+    fun continueLater() {
+        wm.enqueueUniqueWork(
+            UNIQUE_ANALYSIS,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            request(requiresCharging = settings.current.onlyWhileCharging, limit = 0),
+        )
+    }
+
+    private fun request(requiresCharging: Boolean, limit: Int) =
+        OneTimeWorkRequestBuilder<AnalysisWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiresBatteryNotLow(true)
+                    .setRequiresCharging(requiresCharging)
+                    .build(),
+            )
+            .setInputData(workDataOf(AnalysisWorker.KEY_LIMIT to limit))
+            .addTag(TAG_ANALYSIS)
+            .build()
 
     fun stopAnalysis() {
         wm.cancelUniqueWork(UNIQUE_ANALYSIS)
@@ -68,8 +83,13 @@ class IndexScheduler(private val context: Context, private val settings: AppSett
         )
     }
 
+    /** Lo stato più significativo: in corso, poi in attesa, poi l'ultimo concluso. */
     val analysisInfo: Flow<WorkInfo?> =
-        wm.getWorkInfosForUniqueWorkFlow(UNIQUE_ANALYSIS).map { list -> list.lastOrNull() }
+        wm.getWorkInfosForUniqueWorkFlow(UNIQUE_ANALYSIS).map { list ->
+            list.firstOrNull { it.state == WorkInfo.State.RUNNING }
+                ?: list.firstOrNull { !it.state.isFinished }
+                ?: list.lastOrNull()
+        }
 
     companion object {
         const val UNIQUE_ANALYSIS = "analysis"

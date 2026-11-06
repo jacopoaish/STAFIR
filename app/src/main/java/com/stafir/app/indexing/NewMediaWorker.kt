@@ -13,8 +13,11 @@ class NewMediaWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val container = (applicationContext as StafirApp).container
         return try {
-            val r = container.mediaSync.sync()
-            if (r.added > 0 || r.updated > 0) container.scheduler.scheduleAnalysis(now = false)
+            container.mediaSync.sync()
+            val pending = container.database.mediaDao().pendingCount(container.settings.current.recognizeVideos)
+            if (pending > 0 && container.settings.current.onboardingDone) {
+                container.scheduler.scheduleAnalysis(now = false)
+            }
             Result.success()
         } catch (_: SecurityException) {
             Result.success()

@@ -16,7 +16,16 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "0.1.$buildNumber (Fase 1)"
-        ndk { abiFilters += listOf("arm64-v8a") }
+    }
+
+    // Un APK per architettura: arm64 per il telefono, x86_64 solo per il test sull'emulatore in CI.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
     }
 
     signingConfigs {
@@ -31,7 +40,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: APK più piccolo e avvio più veloce.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("stafir")
         }
         debug {

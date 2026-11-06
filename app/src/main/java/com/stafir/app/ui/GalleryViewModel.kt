@@ -36,7 +36,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -90,6 +92,25 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     val options: StateFlow<FilterOptions> = _options.asStateFlow()
 
     private var parser: ItalianQueryParser = ItalianQueryParser()
+    private var parserBuiltAt = 0L
+    private var parserTick = -1L
+
+    /** Il parser conosce i luoghi dell'archivio: lo ricostruiamo solo ogni tanto (sono query pesanti). */
+    private suspend fun currentParser(): ItalianQueryParser {
+        val now = System.currentTimeMillis()
+        val tick = stafir.syncTick.value
+        if (tick != parserTick || now - parserBuiltAt > 60_000) {
+            parser = container.buildParser()
+            parserBuiltAt = now
+            parserTick = tick
+        }
+        return parser
+    }
+
+    /** Ultima ricerca per cui la griglia è stata riportata in cima (per non perdere la posizione). */
+    var lastScrolledQuery: SearchQuery? = null
+    /** Posizione dell'ultima foto vista nel visualizzatore, per ritrovarla nella griglia. */
+    var lastViewedIndex: Int? = null
 
     private val effectiveQuery: Flow<SearchQuery> =
         combine(text.debounce(250), chips, stafir.syncTick) { t, c, _ -> t to c }
@@ -110,8 +131,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         .cachedIn(viewModelScope)
 
     private suspend fun resolve(t: String, c: SearchQuery): SearchQuery {
-        parser = container.buildParser()
-        val parsed = parser.parse(t)
+        val parsed = currentParser().parse(t)
         var q = parsed.mergedWith(c)
         var notice: String? = parsed.command?.let {
             "Ho capito il comando «${it.verb}» (${it.description}). Arriverà in una prossima fase: intanto ti mostro i file a cui si applicherebbe."
@@ -200,8 +220,18 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- Stato analisi ----------
 
-    val kindStats: StateFlow<List<KindStat>> = dao.kindStats().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    private val stateStats: Flow<List<StateStat>> = dao.stateStats()
+    /** Statistiche lette ogni pochi secondi (non a ogni scrittura, per non rallentare l'analisi). */
+    private fun <T> polled(periodMs: Long, read: suspend () -> T): Flow<T> = flow {
+        while (true) {
+            emit(read())
+            delay(periodMs)
+        }
+    }.flowOn(Dispatchers.IO)
+
+    val kindStats: StateFlow<List<KindStat>> = stafir.syncTick
+        .mapLatest { withContext(Dispatchers.IO) { dao.kindStats() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val stateStats: Flow<List<StateStat>> = polled(2_000) { dao.stateStats() }
     private val workInfo: Flow<WorkInfo?> = container.scheduler.analysisInfo
 
     val analysis: StateFlow<AnalysisUi> = combine(stateStats, workInfo, settings.values) { stats, info, s ->
@@ -209,7 +239,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val failed = stats.firstOrNull { it.analysisState == -1 }?.count ?: 0
         val pending = stats.firstOrNull { it.analysisState == 0 }?.count ?: 0
         val running = info?.state == WorkInfo.State.RUNNING
-        val enqueued = info?.state == WorkInfo.State.ENQUEUED
+        val enqueued = info?.state == WorkInfo.State.ENQUEUED || info?.state == WorkInfo.State.BLOCKED
         val progress = info?.progress
         val rate = settings.analysisRate
         val eta = progress?.getLong(AnalysisWorker.KEY_ETA, -1L)?.takeIf { it >= 0 }
@@ -224,7 +254,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             tooHot = progress?.getString(AnalysisWorker.KEY_STATE) == AnalysisWorker.PAUSED_HOT,
             etaSeconds = eta,
         )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, AnalysisUi())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AnalysisUi())
 
     fun analyzeNow() = container.scheduler.scheduleAnalysis(now = true)
     fun stopAnalysis() = container.scheduler.stopAnalysis()

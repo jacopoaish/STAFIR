@@ -108,8 +108,12 @@ interface MediaDao {
 
     // ---------- Lettura ----------
 
-    @RawQuery(observedEntities = [MediaEntity::class, MediaLabelEntity::class, MediaFtsEntity::class])
+    /** Osserva solo [UiVersionEntity]: la griglia si aggiorna quando chiamiamo [bumpUi]. */
+    @RawQuery(observedEntities = [UiVersionEntity::class])
     fun pagingSource(query: SupportSQLiteQuery): PagingSource<Int, MediaEntity>
+
+    @Query("INSERT OR REPLACE INTO ui_version (id, version) VALUES (0, :version)")
+    suspend fun bumpUi(version: Long = System.currentTimeMillis())
 
     @RawQuery
     suspend fun countRaw(query: SupportSQLiteQuery): Int
@@ -121,10 +125,10 @@ interface MediaDao {
     suspend fun labelsFor(id: Long): List<MediaLabelEntity>
 
     @Query("SELECT isVideo, COUNT(*) AS count, COALESCE(SUM(sizeBytes), 0) AS bytes FROM media GROUP BY isVideo")
-    fun kindStats(): Flow<List<KindStat>>
+    suspend fun kindStats(): List<KindStat>
 
     @Query("SELECT analysisState, COUNT(*) AS count FROM media GROUP BY analysisState")
-    fun stateStats(): Flow<List<StateStat>>
+    suspend fun stateStats(): List<StateStat>
 
     @Query("SELECT * FROM media WHERE analysisState = -1 ORDER BY dateTaken DESC LIMIT 300")
     fun failed(): Flow<List<MediaEntity>>

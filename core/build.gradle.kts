@@ -16,7 +16,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 ksp {
@@ -34,4 +37,8 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.exifinterface)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.coroutines.test)
+    testImplementation(libs.paging.testing)
 }

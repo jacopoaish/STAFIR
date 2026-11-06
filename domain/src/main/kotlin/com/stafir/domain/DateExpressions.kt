@@ -11,12 +11,9 @@ internal object DateExpressions {
         "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
         "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
     )
-    private val MONTH_ALIASES = mapOf(
-        "gen" to 1, "feb" to 2, "mar" to 3, "apr" to 4, "mag" to 5, "giu" to 6,
-        "lug" to 7, "ago" to 8, "set" to 9, "sett" to 9, "ott" to 10, "nov" to 11, "dic" to 12,
-    )
-
-    private fun month(t: String): Int? = MONTHS.indexOf(t).takeIf { it >= 0 }?.plus(1) ?: MONTH_ALIASES[t]
+    // Niente abbreviazioni ("mar", "set"...): si confondono con parole normali o con
+    // parole a metà mentre si scrive (es. "mar" → "mare").
+    private fun month(t: String): Int? = MONTHS.indexOf(t).takeIf { it >= 0 }?.plus(1)
 
     private fun year(t: String?): Int? = t?.toIntOrNull()?.takeIf { it in 1900..2100 && t.length == 4 }
 

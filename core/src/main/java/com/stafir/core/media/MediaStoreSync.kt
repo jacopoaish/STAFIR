@@ -9,6 +9,8 @@ import androidx.room.withTransaction
 import com.stafir.core.db.MediaEntity
 import com.stafir.core.db.StafirDatabase
 import com.stafir.domain.SourceClassifier
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Conteggio dell'archivio mostrato al primo avvio. */
 data class ArchiveCount(val photos: Int, val videos: Int, val photoBytes: Long, val videoBytes: Long) {
@@ -25,6 +27,8 @@ data class SyncResult(val added: Int, val updated: Int, val removed: Int, val fu
 class MediaStoreSync(private val context: Context, private val db: StafirDatabase) {
 
     private val resolver get() = context.contentResolver
+    /** Una sola sincronizzazione alla volta (le richieste arrivano da più parti). */
+    private val mutex = Mutex()
     private val prefs = context.getSharedPreferences("media_sync", Context.MODE_PRIVATE)
 
     private val imagesUri: Uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -50,7 +54,11 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
      * Sincronizza. La prima volta (o se MediaStore è stato ricostruito) legge tutto;
      * le volte successive legge solo ciò che è cambiato dall'ultima generazione vista.
      */
-    suspend fun sync(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): SyncResult {
+    suspend fun sync(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): SyncResult = mutex.withLock {
+        syncLocked(onProgress)
+    }
+
+    private suspend fun syncLocked(onProgress: (done: Int, total: Int) -> Unit): SyncResult {
         val version = MediaStore.getVersion(context)
         val lastGen = prefs.getLong(KEY_GENERATION, -1)
         val full = lastGen < 0 || prefs.getString(KEY_VERSION, null) != version
@@ -110,6 +118,7 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
             }
         }
         if (removed.isNotEmpty()) dao.deleteCompletely(removed)
+        if (full || toInsert.isNotEmpty() || toUpdate.isNotEmpty() || removed.isNotEmpty()) dao.bumpUi()
 
         prefs.edit().putLong(KEY_GENERATION, maxGen).putString(KEY_VERSION, version)
             .putLong(KEY_LAST_SYNC, System.currentTimeMillis()).apply()

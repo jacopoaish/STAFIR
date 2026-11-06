@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
@@ -52,7 +53,8 @@ class MainActivity : ComponentActivity() {
                     return@StafirTheme
                 }
                 val nav = rememberNavController()
-                val start = if (s.onboardingDone && Permissions.hasMediaAccess(this)) "home" else "onboarding"
+                // Calcolato una volta sola: cambiare la destinazione iniziale ricreerebbe la navigazione.
+                val start = remember { if (s.onboardingDone && Permissions.hasMediaAccess(this)) "home" else "onboarding" }
                 NavHost(navController = nav, startDestination = start) {
                     composable("onboarding") {
                         OnboardingScreen(onFinished = {

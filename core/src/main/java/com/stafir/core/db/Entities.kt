@@ -76,6 +76,14 @@ data class MediaFtsEntity(
     val content: String,
 )
 
+/**
+ * Contatore che la griglia osserva per aggiornarsi. Lo incrementiamo noi quando serve
+ * (file nuovi/cancellati, ogni tanto durante l'analisi), così lo scorrimento resta fluido
+ * anche mentre migliaia di foto vengono analizzate.
+ */
+@Entity(tableName = "ui_version")
+data class UiVersionEntity(@PrimaryKey val id: Int = 0, val version: Long)
+
 /** Righe di supporto per le statistiche. */
 data class KindStat(val isVideo: Boolean, val count: Int, val bytes: Long)
 data class StateStat(val analysisState: Int, val count: Int)

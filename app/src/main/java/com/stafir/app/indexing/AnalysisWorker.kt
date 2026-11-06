@@ -3,6 +3,7 @@ package com.stafir.app.indexing
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.os.BatteryManager
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -13,6 +14,8 @@ import androidx.work.workDataOf
 import com.stafir.app.R
 import com.stafir.app.StafirApp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -54,18 +57,27 @@ class AnalysisWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         settings.analysisRunning = true
         val pipeline = AnalysisPipeline(container)
         val power = applicationContext.getSystemService(PowerManager::class.java)
+        val battery = applicationContext.getSystemService(BatteryManager::class.java)
+        val limit = inputData.getInt(KEY_LIMIT, 0)
         val semaphore = Semaphore(PARALLELISM)
         var done = 0
         val start = System.currentTimeMillis()
+        var lastUiBump = start
+        var reachedLimit = false
 
         try {
             while (!isStopped) {
+                // Primo avvio senza carica: analizza solo le foto più recenti, il resto in carica.
+                if (limit > 0 && done >= limit && !battery.isCharging) {
+                    reachedLimit = true
+                    break
+                }
+
                 // Protezione dal surriscaldamento
                 when (power.currentThermalStatus) {
                     PowerManager.THERMAL_STATUS_SEVERE, PowerManager.THERMAL_STATUS_CRITICAL,
                     PowerManager.THERMAL_STATUS_EMERGENCY, PowerManager.THERMAL_STATUS_SHUTDOWN -> {
                         setProgress(progressData(done, total, -1, PAUSED_HOT))
-                        settings.analysisRunning = false
                         return Result.retry()
                     }
                     PowerManager.THERMAL_STATUS_MODERATE -> delay(2_000)
@@ -101,14 +113,23 @@ class AnalysisWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 if (rate > 0) settings.analysisRate = rate
                 val remaining = (total - done).coerceAtLeast(0)
                 val eta = if (rate > 0) (remaining / rate).toLong() else -1L
-                settings.analysisHeartbeat = System.currentTimeMillis()
+                val now = System.currentTimeMillis()
+                settings.analysisHeartbeat = now
                 setProgress(progressData(done, total, eta, RUNNING))
                 notify(done, total, eta)
+                // Ogni tanto la griglia e la ricerca si aggiornano con i nuovi risultati.
+                if (now - lastUiBump > UI_REFRESH_MS) {
+                    dao.bumpUi(now)
+                    lastUiBump = now
+                }
             }
         } finally {
             pipeline.close()
+            // Arresto controllato (fine, pausa, carica staccata): non è un'interruzione del sistema.
+            settings.analysisRunning = false
+            withContext(NonCancellable) { dao.bumpUi() }
         }
-        settings.analysisRunning = isStopped
+        if (reachedLimit) container.scheduler.continueLater()
         return Result.success()
     }
 
@@ -154,6 +175,8 @@ class AnalysisWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val NOTIFICATION_ID = 1001
         const val BATCH = 24
         const val PARALLELISM = 3
+        const val UI_REFRESH_MS = 15_000L
+        const val KEY_LIMIT = "limit"
         const val KEY_DONE = "done"
         const val KEY_TOTAL = "total"
         const val KEY_ETA = "eta"

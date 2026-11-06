@@ -108,4 +108,10 @@ class ItalianQueryParserTest {
     @Test fun photosAndVideosMeansAny() {
         assertEquals(MediaTypeFilter.ANY, parser.parse("foto e video del mare").mediaType)
     }
+
+    @Test fun partialWordsAreNotDates() {
+        val q = parser.parse("mar")
+        assertNull(q.dateRange)
+        assertEquals(listOf("mar"), q.freeText)
+    }
 }

@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [MediaEntity::class, MediaLabelEntity::class, MediaFtsEntity::class],
+    entities = [MediaEntity::class, MediaLabelEntity::class, MediaFtsEntity::class, UiVersionEntity::class],
     version = 1,
     exportSchema = false,
 )

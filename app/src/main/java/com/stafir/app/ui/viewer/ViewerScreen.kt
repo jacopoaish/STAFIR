@@ -96,6 +96,9 @@ fun ViewerScreen(vm: GalleryViewModel, startIndex: Int, onBack: () -> Unit) {
         return
     }
     val pager = rememberPagerState(initialPage = startIndex) { items.itemCount }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.currentPage }.collect { vm.lastViewedIndex = it }
+    }
     var chrome by remember { mutableStateOf(true) }
     var info by remember { mutableStateOf<MediaEntity?>(null) }
     val ctx = LocalContext.current

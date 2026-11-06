@@ -62,9 +62,11 @@ class StafirApp : Application(), SingletonImageLoader.Factory {
         pendingSync = appScope.launch(Dispatchers.IO) {
             delay(delayMs)
             try {
-                val r = container.mediaSync.sync()
+                container.mediaSync.sync()
                 _syncTick.value = System.currentTimeMillis()
-                if ((r.added > 0 || r.updated > 0) && container.settings.current.onboardingDone) {
+                val s = container.settings.current
+                if (s.onboardingDone && container.database.mediaDao().pendingCount(s.recognizeVideos) > 0) {
+                    // KEEP: non disturba un'analisi già in corso o in attesa della carica.
                     container.scheduler.scheduleAnalysis(now = false)
                 }
             } catch (_: SecurityException) {
