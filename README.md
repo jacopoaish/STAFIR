@@ -24,6 +24,7 @@ Galleria intelligente per Android: gestisce, riconosce, classifica e cerca **tut
 | Ricerca in italiano naturale + dettatura vocale + filtri toccabili | ✅ |
 | Analisi in background solo in carica, protezione dal calore, ripresa automatica, file nuovi rilevati da soli | ✅ |
 | Guida HyperOS (avvio automatico, batteria) e rilevamento interruzioni | ✅ |
+| Banco qualità: etichetti a mano alcune tue foto e misuri precisione, richiamo e tempi | ✅ |
 | Riconoscimento comandi ("crea…", "sposta…"): capiti e spiegati, eseguiti nelle prossime fasi | 🟡 |
 
 ## Architettura (moduli separati)
@@ -51,7 +52,15 @@ app/     Interfaccia (Jetpack Compose, Material 3), worker in background, impost
 
 ## Sviluppo
 
-- Compilazione automatica su GitHub Actions a ogni push: test automatici + APK firmato + Release scaricabile.
-- Test: `./gradlew :domain:test testDebugUnitTest`
+- Compilazione automatica su GitHub Actions a ogni push:
+  1. **test automatici** (parser italiano, vocabolario, metriche di qualità, database reale con Robolectric);
+  2. **APK firmato** con R8 (uno per il telefono arm64, uno x86_64 per l'emulatore);
+  3. **test sull'emulatore Android**: carica foto e video di prova (con data e GPS), percorre la procedura guidata,
+     prova le ricerche in italiano, il visualizzatore, il lettore video e "Apri con", salva gli screenshot e
+     controlla che l'app non vada mai in crash;
+  4. solo se tutto passa, pubblica la **Release** con l'APK e le schermate.
+- Test locali: `./gradlew :domain:test testDebugUnitTest`
+- Foto di prova per l'emulatore: `tools/smoke/fixtures` (rigenerabili con `tools/smoke/make_fixtures.py`).
+- Qualità del riconoscimento sulle foto vere: Impostazioni → Avanzate → **Banco qualità**.
 - Dati geografici: `python3 tools/build_geodata.py` (eseguito automaticamente in CI).
 - La chiave in `keystore/` è una chiave **di sviluppo** usata solo per permettere gli aggiornamenti dell'APK di prova.

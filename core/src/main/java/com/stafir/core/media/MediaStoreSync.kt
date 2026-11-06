@@ -69,14 +69,38 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
         val args = if (full) null else arrayOf(lastGen.toString())
 
         var maxGen = maxOf(lastGen, 0L)
-        val toInsert = ArrayList<MediaEntity>()
+        val toInsert = ArrayList<MediaEntity>(FLUSH_EVERY)
         val toUpdate = ArrayList<Pair<MediaEntity, Boolean>>()
         val seen = HashSet<Long>()
+        var added = 0
+        var updated = 0
 
-        for ((uri, isVideo) in listOf(imagesUri to false, videoUri to true)) {
-            resolver.query(uri, projection(isVideo), selection, args, null)?.use { c ->
-                val total = c.count
-                var done = 0
+        // Scrive a blocchi: con centinaia di migliaia di file non teniamo tutto in memoria.
+        suspend fun flush() {
+            if (toInsert.isEmpty() && toUpdate.isEmpty()) return
+            db.withTransaction {
+                toInsert.chunked(500).forEach { dao.insertAll(it) }
+                toUpdate.forEach { (e, reset) ->
+                    dao.updateMetadata(
+                        e.id, e.displayName, e.relativePath, e.bucketName, e.mimeType, e.sizeBytes, e.width, e.height,
+                        e.durationMs, e.dateTaken, e.dateModified, e.generation, e.isFavorite, e.source, reset,
+                    )
+                }
+            }
+            added += toInsert.size
+            updated += toUpdate.size
+            toInsert.clear()
+            toUpdate.clear()
+        }
+
+        val cursors = listOf(imagesUri to false, videoUri to true).map { (uri, isVideo) ->
+            resolver.query(uri, projection(isVideo), selection, args, null) to isVideo
+        }
+        try {
+            val total = cursors.sumOf { it.first?.count ?: 0 }
+            var done = 0
+            for ((c, isVideo) in cursors) {
+                if (c == null) continue
                 val idx = Columns(c)
                 while (c.moveToNext()) {
                     val e = idx.read(c, isVideo)
@@ -89,17 +113,21 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
                         val contentChanged = old.dateModified != e.dateModified || old.sizeBytes != e.sizeBytes
                         toUpdate += e to contentChanged
                     }
+                    if (toInsert.size + toUpdate.size >= FLUSH_EVERY) flush()
                     if (++done % 2000 == 0) onProgress(done, total)
                 }
-                onProgress(total, total)
             }
+            flush()
+            onProgress(total, total)
+        } finally {
+            cursors.forEach { it.first?.close() }
         }
 
         // File cancellati con altre app: confronto degli identificativi (veloce, solo gli ID).
         val removed = if (full) {
             existing.keys.filter { it !in seen }
         } else {
-            val current = HashSet<Long>(existing.size + toInsert.size)
+            val current = HashSet<Long>(existing.size + added)
             for (uri in listOf(imagesUri, videoUri)) {
                 resolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)?.use { c ->
                     while (c.moveToNext()) current += c.getLong(0)
@@ -108,21 +136,12 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
             existing.keys.filter { it !in current }
         }
 
-        db.withTransaction {
-            toInsert.chunked(500).forEach { dao.insertAll(it) }
-            toUpdate.forEach { (e, reset) ->
-                dao.updateMetadata(
-                    e.id, e.displayName, e.relativePath, e.bucketName, e.mimeType, e.sizeBytes, e.width, e.height,
-                    e.durationMs, e.dateTaken, e.dateModified, e.generation, e.isFavorite, e.source, reset,
-                )
-            }
-        }
         if (removed.isNotEmpty()) dao.deleteCompletely(removed)
-        if (full || toInsert.isNotEmpty() || toUpdate.isNotEmpty() || removed.isNotEmpty()) dao.bumpUi()
+        if (full || added > 0 || updated > 0 || removed.isNotEmpty()) dao.bumpUi()
 
         prefs.edit().putLong(KEY_GENERATION, maxGen).putString(KEY_VERSION, version)
             .putLong(KEY_LAST_SYNC, System.currentTimeMillis()).apply()
-        return SyncResult(toInsert.size, toUpdate.size, removed.size, full)
+        return SyncResult(added, updated, removed.size, full)
     }
 
     fun forceFullSyncNextTime() {
@@ -195,6 +214,7 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
     }
 
     companion object {
+        private const val FLUSH_EVERY = 1000
         private const val KEY_GENERATION = "generation"
         private const val KEY_VERSION = "version"
         private const val KEY_LAST_SYNC = "last_sync"
