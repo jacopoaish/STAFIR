@@ -1,13 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icona "Obiettivo intelligente": anello dell'obiettivo, scintilla dell'AI e flash.
+     Tutto entro la zona sicura (cerchio di 66dp al centro), così nessun launcher lo taglia. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <!-- cornice foto -->
-    <path android:fillColor="#FFFFFFFF"
-        android:pathData="M34,36h40a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-40a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
-    <!-- montagne -->
-    <path android:fillColor="#FF4F46E5"
-        android:pathData="M33,71l14,-17 9,11 6,-7 13,13z" />
-    <!-- sole / scintilla AI -->
-    <path android:fillColor="#FFF59E0B"
-        android:pathData="M66,42l2.2,5.3 5.3,2.2 -5.3,2.2 -2.2,5.3 -2.2,-5.3 -5.3,-2.2 5.3,-2.2z" />
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M35,54 a19,19 0 1,0 38,0 a19,19 0 1,0 -38,0"
+        android:strokeWidth="6"
+        android:strokeColor="#FFFFFFFF" />
+    <path
+        android:fillColor="#FFFCD34D"
+        android:pathData="M54,43 Q55.5,52.5 65,54 Q55.5,55.5 54,65 Q52.5,55.5 43,54 Q52.5,52.5 54,43 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M69.5,35 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" />
 </vector>

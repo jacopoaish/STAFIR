@@ -183,7 +183,13 @@ if [ -n "$ID" ]; then
   shot 24-apri-con 3
 fi
 
-# 10) Esito
+# 10) Icona nell'elenco delle app del launcher
+adb shell input keyevent 3 </dev/null; sleep 2
+adb shell input swipe 540 1900 540 400 300 </dev/null; sleep 3
+dump
+shot 25-icona-launcher 1
+
+# 11) Esito
 adb logcat -d > "$OUT/logcat.txt"
 adb logcat -d -b crash > "$OUT/crash.txt" 2>/dev/null
 grep -E "AnalysisWorker|StafirApp|OfflineGeocoder|AndroidRuntime" "$OUT/logcat.txt" | tail -50 > "$OUT/logcat-app.txt"
