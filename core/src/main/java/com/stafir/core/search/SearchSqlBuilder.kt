@@ -22,15 +22,15 @@ object SearchSqlBuilder {
         }
         q.dateRange?.let {
             clauses += "dateTaken >= ? AND dateTaken < ?"
-            args += it.fromMs; args += it.toMs
+            args.add(it.fromMs); args.add(it.toMs)
         }
         if (q.sources.isNotEmpty()) {
             clauses += "source IN (${q.sources.joinToString(",") { "?" }})"
-            args += q.sources.map { it.name }
+            args.addAll(q.sources.map { it.name })
         }
         if (q.places.isNotEmpty()) {
             val parts = q.places.map {
-                args += it.value
+                args.add(it.value)
                 when (it.level) {
                     PlaceLevel.CITY -> "city = ?"
                     PlaceLevel.REGION -> "region = ?"
@@ -43,13 +43,13 @@ object SearchSqlBuilder {
         q.concepts.forEach { concept ->
             if (concept.labels.isEmpty()) return@forEach
             clauses += "id IN (SELECT mediaId FROM media_label WHERE label IN (${concept.labels.joinToString(",") { "?" }}) AND confidence >= ?)"
-            args += concept.labels.toList()
-            args += minConfidence
+            args.addAll(concept.labels)
+            args.add(minConfidence)
         }
         val ftsTerms = q.freeText.map { TextNormalizer.normalize(it).replace(" ", "") }.filter { it.isNotBlank() }
         if (ftsTerms.isNotEmpty()) {
             clauses += "id IN (SELECT rowid FROM media_fts WHERE media_fts MATCH ?)"
-            args += ftsTerms.joinToString(" ") { "$it*" }
+            args.add(ftsTerms.joinToString(" ") { "$it*" })
         }
         val where = if (clauses.isEmpty()) "" else "WHERE " + clauses.joinToString(" AND ")
         return Sql(where, args)

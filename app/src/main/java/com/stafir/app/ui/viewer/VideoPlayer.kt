@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 
 /** Lettore video (Media3/ExoPlayer) con i controlli standard. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun VideoPlayer(uri: Uri, playing: Boolean, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
