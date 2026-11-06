@@ -35,8 +35,13 @@ data class MediaEntity(
     val width: Int,
     val height: Int,
     val durationMs: Long,
-    /** Data di scatto in millisecondi (o data di modifica se assente). */
+    /** Data di scatto in millisecondi. */
     val dateTaken: Long,
+    /**
+     * true se la data non viene dai metadati di scatto ma è stimata (dal nome del file o dalla
+     * data di modifica): durante l'analisi proviamo a migliorarla leggendo l'EXIF.
+     */
+    val dateEstimated: Boolean = false,
     /** Data di modifica in secondi (da MediaStore), usata per capire se il file è cambiato. */
     val dateModified: Long,
     val generation: Long,

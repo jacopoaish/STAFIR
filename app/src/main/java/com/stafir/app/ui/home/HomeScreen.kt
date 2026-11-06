@@ -84,6 +84,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -146,8 +147,11 @@ fun HomeScreen(
     }
 
     val selecting = selection.isNotEmpty()
-    BackHandler(enabled = selecting) { vm.clearSelection() }
-    BackHandler(enabled = !selecting && (text.isNotEmpty() || !chips.isEmpty)) { vm.clearAll() }
+    var searchFocused by remember { mutableStateOf(false) }
+    // "Indietro": prima chiude la tastiera, poi annulla la selezione, poi azzera la ricerca.
+    BackHandler(enabled = searchFocused) { focus.clearFocus() }
+    BackHandler(enabled = !searchFocused && selecting) { vm.clearSelection() }
+    BackHandler(enabled = !searchFocused && !selecting && (text.isNotEmpty() || !chips.isEmpty)) { vm.clearAll() }
 
     // Torna in cima solo quando cambia davvero la ricerca (non al ritorno dal visualizzatore)
     val query by vm.currentQuery.collectAsStateWithLifecycle()
@@ -181,7 +185,7 @@ fun HomeScreen(
         topBar = {
             if (selecting) {
                 TopAppBar(
-                    title = { Text("${selection.size} selezionati") },
+                    title = { Text(Format.plural(selection.size, "selezionato", "selezionati")) },
                     navigationIcon = { IconButton(onClick = { vm.clearSelection() }) { Icon(Icons.Filled.Close, "Annulla") } },
                     actions = {
                         IconButton(onClick = {
@@ -205,7 +209,7 @@ fun HomeScreen(
                         TextField(
                             value = text,
                             onValueChange = { vm.text.value = it },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).onFocusChanged { searchFocused = it.isFocused },
                             placeholder = { Text("Cerca o chiedi… es. «mare in Sicilia 2024»", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = { Icon(Icons.Filled.Search, null) },
                             trailingIcon = {

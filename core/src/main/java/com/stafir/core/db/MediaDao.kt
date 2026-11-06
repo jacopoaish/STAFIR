@@ -21,20 +21,25 @@ interface MediaDao {
     @Query("SELECT id FROM media")
     suspend fun allIds(): List<Long>
 
+    @Query("SELECT COUNT(*) FROM media")
+    suspend fun count(): Int
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(items: List<MediaEntity>)
 
     @Query(
         """UPDATE media SET displayName = :displayName, relativePath = :relativePath, bucketName = :bucketName,
         mimeType = :mimeType, sizeBytes = :sizeBytes, width = :width, height = :height, durationMs = :durationMs,
-        dateTaken = :dateTaken, dateModified = :dateModified, generation = :generation, isFavorite = :isFavorite,
+        dateTaken = CASE WHEN :dateEstimated AND dateEstimated = 0 AND NOT :resetAnalysis THEN dateTaken ELSE :dateTaken END,
+        dateEstimated = CASE WHEN :dateEstimated AND dateEstimated = 0 AND NOT :resetAnalysis THEN 0 ELSE :dateEstimated END,
+        dateModified = :dateModified, generation = :generation, isFavorite = :isFavorite,
         source = :source, analysisState = CASE WHEN :resetAnalysis THEN 0 ELSE analysisState END
         WHERE id = :id""",
     )
     suspend fun updateMetadata(
         id: Long, displayName: String, relativePath: String, bucketName: String?, mimeType: String?,
-        sizeBytes: Long, width: Int, height: Int, durationMs: Long, dateTaken: Long, dateModified: Long,
-        generation: Long, isFavorite: Boolean, source: String, resetAnalysis: Boolean,
+        sizeBytes: Long, width: Int, height: Int, durationMs: Long, dateTaken: Long, dateEstimated: Boolean,
+        dateModified: Long, generation: Long, isFavorite: Boolean, source: String, resetAnalysis: Boolean,
     )
 
     @Query("DELETE FROM media WHERE id IN (:ids)")
@@ -65,12 +70,14 @@ interface MediaDao {
 
     @Query(
         """UPDATE media SET analysisState = :state, analysisVersion = :version, analysisError = :error,
-        analyzedAt = :at, latitude = :lat, longitude = :lon, city = :city, region = :region, country = :country
+        analyzedAt = :at, latitude = :lat, longitude = :lon, city = :city, region = :region, country = :country,
+        dateTaken = :dateTaken, dateEstimated = :dateEstimated
         WHERE id = :id""",
     )
     suspend fun updateAnalysis(
         id: Long, state: Int, version: Int, error: String?, at: Long,
         lat: Double?, lon: Double?, city: String?, region: String?, country: String?,
+        dateTaken: Long, dateEstimated: Boolean,
     )
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -94,6 +101,7 @@ interface MediaDao {
         updateAnalysis(
             id = media.id, state = 1, version = version, error = null, at = System.currentTimeMillis(),
             lat = media.latitude, lon = media.longitude, city = media.city, region = media.region, country = media.country,
+            dateTaken = media.dateTaken, dateEstimated = media.dateEstimated,
         )
     }
 

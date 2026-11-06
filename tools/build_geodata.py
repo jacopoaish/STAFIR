@@ -34,7 +34,10 @@ def main() -> int:
             p = raw.rstrip("\n").split("\t")
             if len(p) < 11:
                 continue
-            name, lat, lon, cc, a1 = p[1], p[4], p[5], p[8], p[10]
+            name, lat, lon, fcode, cc, a1 = p[1], p[4], p[5], p[7], p[8], p[10]
+            # Solo città e paesi veri: niente quartieri (PPLX, es. "Esquilino" a Roma) né luoghi storici/abbandonati.
+            if fcode in ("PPLX", "PPLH", "PPLQ", "PPLW", "PPLCH"):
+                continue
             region = admin1.get(f"{cc}.{a1}", "")
             rows.append(f"{name}\t{float(lat):.4f}\t{float(lon):.4f}\t{cc}\t{region}")
 

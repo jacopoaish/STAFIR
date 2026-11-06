@@ -27,7 +27,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: core/src/main/assets/geo/cities.tsv
-          key: geonames-cities15000-v1
+          key: geonames-cities15000-v2
 
       - name: Dati geografici offline (GeoNames)
         if: steps.geocache.outputs.cache-hit != 'true'

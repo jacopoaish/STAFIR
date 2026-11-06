@@ -8,7 +8,9 @@ import android.provider.MediaStore
 import androidx.room.withTransaction
 import com.stafir.core.db.MediaEntity
 import com.stafir.core.db.StafirDatabase
+import com.stafir.domain.FileNameDates
 import com.stafir.domain.SourceClassifier
+import java.time.ZoneId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -61,8 +63,9 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
     private suspend fun syncLocked(onProgress: (done: Int, total: Int) -> Unit): SyncResult {
         val version = MediaStore.getVersion(context)
         val lastGen = prefs.getLong(KEY_GENERATION, -1)
-        val full = lastGen < 0 || prefs.getString(KEY_VERSION, null) != version
         val dao = db.mediaDao()
+        // Completa anche se il database è stato ricreato (es. aggiornamento dell'app).
+        val full = lastGen < 0 || prefs.getString(KEY_VERSION, null) != version || dao.count() == 0
 
         val existing = dao.allSyncKeys().associateBy { it.id }
         val selection = if (full) null else "${MediaStore.MediaColumns.GENERATION_MODIFIED} > ?"
@@ -83,7 +86,7 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
                 toUpdate.forEach { (e, reset) ->
                     dao.updateMetadata(
                         e.id, e.displayName, e.relativePath, e.bucketName, e.mimeType, e.sizeBytes, e.width, e.height,
-                        e.durationMs, e.dateTaken, e.dateModified, e.generation, e.isFavorite, e.source, reset,
+                        e.durationMs, e.dateTaken, e.dateEstimated, e.dateModified, e.generation, e.isFavorite, e.source, reset,
                     )
                 }
             }
@@ -167,6 +170,7 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
     }.toTypedArray()
 
     private class Columns(c: Cursor) {
+        val zone: ZoneId = ZoneId.systemDefault()
         val id = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
         val name = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
         val path = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
@@ -188,7 +192,12 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
             val relativePath = c.getString(path) ?: ""
             val modifiedSec = c.getLong(modified)
             var takenMs = if (c.isNull(taken)) 0L else c.getLong(taken)
-            if (takenMs <= 0L) takenMs = (if (modifiedSec > 0) modifiedSec else c.getLong(added)) * 1000L
+            val estimated = takenMs <= 0L
+            if (estimated) {
+                // Niente data di scatto nei metadati: prima il nome del file, poi la data di modifica.
+                takenMs = FileNameDates.parse(displayName, zone)
+                    ?: ((if (modifiedSec > 0) modifiedSec else c.getLong(added)) * 1000L)
+            }
             var w = c.getInt(width)
             var h = c.getInt(height)
             val rot = if (c.isNull(orientation)) 0 else c.getInt(orientation)
@@ -205,6 +214,7 @@ class MediaStoreSync(private val context: Context, private val db: StafirDatabas
                 height = h,
                 durationMs = if (duration >= 0 && !c.isNull(duration)) c.getLong(duration) else 0L,
                 dateTaken = takenMs,
+                dateEstimated = estimated,
                 dateModified = modifiedSec,
                 generation = c.getLong(gen),
                 isFavorite = c.getInt(fav) == 1,

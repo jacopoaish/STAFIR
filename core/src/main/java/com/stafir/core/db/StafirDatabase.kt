@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [MediaEntity::class, MediaLabelEntity::class, MediaFtsEntity::class, UiVersionEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class StafirDatabase : RoomDatabase() {

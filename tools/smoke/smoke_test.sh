@@ -91,10 +91,10 @@ for line in "${FIXTURES[@]}"; do
   adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/$folder/$name" </dev/null >/dev/null 2>&1
 done
 for _ in $(seq 1 30); do
-  [ "$(media_count)" = "10 foto, 1 video" ] && break
+  [ "$(media_count)" = "9 foto, 1 video" ] && break
   sleep 2
 done
-log "Nella libreria multimediale: $(media_count) (attesi 10 foto, 1 video)"
+log "Nella libreria multimediale: $(media_count) (attesi 9 foto, 1 video)"
 
 # 2) Installazione e permessi (concessi in anticipo: il dialogo di sistema non è testabile qui)
 adb install -r "$APK" || { log "❌ Installazione non riuscita"; exit 1; }
@@ -150,6 +150,7 @@ restart
 if tap "Impostazioni"; then
   shot 19-impostazioni 2
   if tap "Archivio e avanzamento"; then shot 20-archivio 2; adb shell input keyevent 4 </dev/null; sleep 1; fi
+  adb shell input swipe 540 1800 540 500 300 </dev/null; sleep 1
   if tap "Avanzate"; then
     adb shell input swipe 540 1800 540 600 300 </dev/null; sleep 1
     shot 21-avanzate 1

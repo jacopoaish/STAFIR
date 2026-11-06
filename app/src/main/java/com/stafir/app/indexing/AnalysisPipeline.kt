@@ -9,7 +9,7 @@ import com.stafir.app.AppContainer
 import com.stafir.app.AppSettings
 import com.stafir.core.db.MediaEntity
 import com.stafir.core.db.MediaLabelEntity
-import com.stafir.core.media.LocationReader
+import com.stafir.core.media.MediaMetadataReader
 import com.stafir.core.media.contentUri
 import com.stafir.domain.Source
 import com.stafir.domain.Vocabulary
@@ -24,7 +24,7 @@ import java.util.Locale
 class AnalysisPipeline(private val container: AppContainer) : AutoCloseable {
 
     private val frames = FrameLoader(container.context)
-    private val locations = LocationReader(container.context)
+    private val metadata = MediaMetadataReader(container.context)
     // Salviamo le etichette da 0.4 in su; la soglia di ricerca è regolabile in "Avanzate".
     private val scenes by lazy { MlKitSceneRecognizer(minConfidence = 0.4f) }
     private val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.ITALIAN)
@@ -53,13 +53,18 @@ class AnalysisPipeline(private val container: AppContainer) : AutoCloseable {
         // 1) Scene e oggetti
         val labels: List<RecognizedLabel> = if (s.recognizeScenes) recognize(m, s.recognizeVideos) else emptyList()
 
-        // 2) Luogo (GPS -> città/regione/paese, senza internet)
+        // 2) Metadati originali: luogo (GPS -> città/regione/paese, senza internet) e data di scatto
         var updated = m
+        val needsDate = m.dateEstimated && !m.isVideo
+        val meta = if (s.recognizePlaces || needsDate) metadata.read(uri, m.isVideo) else null
+        if (needsDate && meta?.dateTakenMs != null) {
+            updated = updated.copy(dateTaken = meta.dateTakenMs!!, dateEstimated = false)
+        }
         if (s.recognizePlaces) {
-            val ll = locations.read(uri, m.isVideo)
+            val ll = meta?.latLon
             if (ll != null) {
                 val place = container.geocoder.lookup(ll.first, ll.second)
-                updated = m.copy(
+                updated = updated.copy(
                     latitude = ll.first, longitude = ll.second,
                     city = place?.city, region = place?.region, country = place?.country,
                 )

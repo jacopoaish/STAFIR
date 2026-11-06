@@ -113,11 +113,27 @@ class MediaDaoTest {
     @Test fun metadataUpdateResetsAnalysisOnlyWhenContentChanged() = runBlocking {
         val m = dao.byId(1)!!
         dao.updateMetadata(m.id, m.displayName, m.relativePath, m.bucketName, m.mimeType, m.sizeBytes, m.width, m.height,
-            m.durationMs, m.dateTaken, m.dateModified, m.generation, true, m.source, resetAnalysis = false)
+            m.durationMs, m.dateTaken, false, m.dateModified, m.generation, true, m.source, resetAnalysis = false)
         assertEquals(1, dao.byId(1)!!.analysisState)
         dao.updateMetadata(m.id, m.displayName, m.relativePath, m.bucketName, m.mimeType, m.sizeBytes + 1, m.width, m.height,
-            m.durationMs, m.dateTaken, m.dateModified + 10, m.generation, true, m.source, resetAnalysis = true)
+            m.durationMs, m.dateTaken, false, m.dateModified + 10, m.generation, true, m.source, resetAnalysis = true)
         assertEquals(0, dao.byId(1)!!.analysisState)
+    }
+
+    @Test fun improvedDateIsKeptWhenOnlyFavoriteChanges() = runBlocking {
+        // L'analisi ha trovato la data vera nell'EXIF: un cambio "preferito" non deve riportarla alla stima.
+        val m = dao.byId(3)!!
+        val exifDate = ms(2023, 1, 5) + 3_600_000
+        dao.updateAnalysis(m.id, 1, 1, null, 0, null, null, null, null, null, exifDate, false)
+        dao.updateMetadata(m.id, m.displayName, m.relativePath, m.bucketName, m.mimeType, m.sizeBytes, m.width, m.height,
+            m.durationMs, 999L, true, m.dateModified, m.generation, true, m.source, resetAnalysis = false)
+        assertEquals(exifDate, dao.byId(3)!!.dateTaken)
+        assertEquals(false, dao.byId(3)!!.dateEstimated)
+        // Se invece il file cambia davvero, la stima nuova vale finché l'analisi non rilegge l'EXIF.
+        dao.updateMetadata(m.id, m.displayName, m.relativePath, m.bucketName, m.mimeType, m.sizeBytes + 5, m.width, m.height,
+            m.durationMs, 999L, true, m.dateModified + 5, m.generation, true, m.source, resetAnalysis = true)
+        assertEquals(999L, dao.byId(3)!!.dateTaken)
+        assertEquals(true, dao.byId(3)!!.dateEstimated)
     }
 
     @Test fun pagingReturnsNewestFirst() = runBlocking {
