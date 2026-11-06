@@ -14,7 +14,17 @@ FAIL=0
 
 log() { echo "$@"; echo "$@" >> "$REPORT"; }
 shot() { sleep "${2:-1}"; adb exec-out screencap -p </dev/null > "$OUT/$1.png"; echo "📸 $1"; }
-dump() { adb shell uiautomator dump /sdcard/ui.xml </dev/null >/dev/null 2>&1; adb pull /sdcard/ui.xml "$OUT/ui.xml" </dev/null >/dev/null 2>&1; }
+raw_dump() { adb shell uiautomator dump /sdcard/ui.xml </dev/null >/dev/null 2>&1; adb pull /sdcard/ui.xml "$OUT/ui.xml" </dev/null >/dev/null 2>&1; }
+dump() {
+  raw_dump
+  # L'emulatore a volte mostra "<app di sistema> isn't responding": lo chiudiamo (non riguarda Stafir).
+  if grep -qE "responding|non risponde" "$OUT/ui.xml" 2>/dev/null; then
+    local w
+    w=$(python3 "$DIR/find_node.py" "$OUT/ui.xml" "Wait")
+    [ -z "$w" ] && w=$(python3 "$DIR/find_node.py" "$OUT/ui.xml" "Attendi")
+    if [ -n "$w" ]; then adb shell input tap $w </dev/null; echo "🔧 chiuso un avviso di sistema dell'emulatore"; sleep 2; raw_dump; fi
+  fi
+}
 find_node() { dump; python3 "$DIR/find_node.py" "$OUT/ui.xml" "$@"; }
 wait_for() { # attende che compaia un testo
   local tries=${2:-30}
@@ -25,7 +35,7 @@ wait_for() { # attende che compaia un testo
   log "❌ Non compare: $1"; cp "$OUT/ui.xml" "$OUT/ui-missing-$(echo "$1" | tr -cd 'a-zA-Z0-9').xml"; return 1
 }
 tap() {
-  local tries=${2:-20}
+  local tries=${2:-12}
   for _ in $(seq 1 "$tries"); do
     local c
     c=$(find_node "$1")
@@ -77,6 +87,10 @@ media_count() {
 log "# Test sull'emulatore"
 log ""
 adb wait-for-device
+# Niente finestre di errore di sistema dell'emulatore (es. launcher lento) sopra l'app
+adb shell settings put global hide_error_dialogs 1 </dev/null
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS </dev/null >/dev/null 2>&1
+sleep 10
 log "Dispositivo: $(adb shell getprop ro.product.model) · Android $(adb shell getprop ro.build.version.release)"
 
 # 1) Foto e video di prova (con data e GPS)
