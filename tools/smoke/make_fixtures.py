@@ -77,15 +77,50 @@ def write_receipt(out_dir):
     im.save(os.path.join(out_dir, "IMG_20240412_213500.jpg"), "JPEG", quality=85, exif=exif)
 
 
+def add_xyz_location(path, text):
+    """Aggiunge la posizione nel box '©xyz' (moov/udta), il formato scritto dalle fotocamere Android.
+
+    Il box 'moov' deve essere l'ultimo del file: così aggiungere byte non sposta i dati video.
+    """
+    import struct
+    data = bytearray(open(path, "rb").read())
+    pos, moov = 0, None
+    while pos < len(data):
+        size, kind = struct.unpack(">I4s", data[pos:pos + 8])
+        if kind == b"moov":
+            moov = (pos, size)
+        pos += size
+    assert moov and moov[0] + moov[1] == len(data), "moov deve essere l'ultimo box"
+    payload = text.encode()
+    xyz = struct.pack(">I4sHH", 12 + len(payload), b"\xa9xyz", len(payload), 0x15C7) + payload
+    # cerca udta come ultimo figlio di moov
+    start, end = moov[0] + 8, moov[0] + moov[1]
+    child, last = start, None
+    while child < end:
+        csize, ckind = struct.unpack(">I4s", data[child:child + 8])
+        last = (child, csize, ckind)
+        child += csize
+    if last and last[2] == b"udta":
+        data += xyz
+        struct.pack_into(">I", data, last[0], last[1] + len(xyz))
+        struct.pack_into(">I", data, moov[0], moov[1] + len(xyz))
+    else:
+        udta = struct.pack(">I4s", 8 + len(xyz), b"udta") + xyz
+        data += udta
+        struct.pack_into(">I", data, moov[0], moov[1] + len(udta))
+    open(path, "wb").write(bytes(data))
+
+
 def write_video(out_dir):
     # 4 secondi dalla foto della spiaggia, con posizione (Mondello) e data nei metadati
+    out = os.path.join(out_dir, "VID_20230815_102000.mp4")
     subprocess.run([
         "ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-i", os.path.join(SRC, "tf2.jpg"),
         "-vf", "scale=1280:-2,zoompan=z='min(zoom+0.0015,1.2)':d=100:s=1280x852,format=yuv420p",
         "-t", "4", "-r", "25", "-c:v", "libx264", "-preset", "veryfast", "-crf", "30",
-        "-metadata", "location=+38.1938+013.3275/", "-metadata", "creation_time=2023-08-15T10:20:00Z",
-        "-movflags", "+faststart", os.path.join(out_dir, "VID_20230815_102000.mp4"),
+        "-metadata", "creation_time=2023-08-15T10:20:00Z", out,
     ], check=True)
+    add_xyz_location(out, "+38.1938+013.3275/")
 
 
 def main():

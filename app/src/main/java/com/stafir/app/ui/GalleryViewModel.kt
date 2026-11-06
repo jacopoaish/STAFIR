@@ -94,15 +94,22 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     private var parser: ItalianQueryParser = ItalianQueryParser()
     private var parserBuiltAt = 0L
     private var parserTick = -1L
+    private var parserAnalyzed = -1
 
-    /** Il parser conosce i luoghi dell'archivio: lo ricostruiamo solo ogni tanto (sono query pesanti). */
+    /**
+     * Il parser conosce i luoghi dell'archivio: lo ricostruiamo quando cambiano i file o quando
+     * l'analisi ha trovato nuovi luoghi, e comunque non più di una volta ogni pochi secondi.
+     */
     private suspend fun currentParser(): ItalianQueryParser {
         val now = System.currentTimeMillis()
         val tick = stafir.syncTick.value
-        if (tick != parserTick || now - parserBuiltAt > 60_000) {
+        val analyzed = dao.stateStats().firstOrNull { it.analysisState == 1 }?.count ?: 0
+        val changed = tick != parserTick || analyzed != parserAnalyzed
+        if ((changed && now - parserBuiltAt > 3_000) || now - parserBuiltAt > 60_000 || parserTick == -1L) {
             parser = container.buildParser()
             parserBuiltAt = now
             parserTick = tick
+            parserAnalyzed = analyzed
         }
         return parser
     }
