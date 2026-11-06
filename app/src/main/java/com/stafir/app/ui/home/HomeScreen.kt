@@ -140,6 +140,10 @@ fun HomeScreen(
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
+    // Scorrendo i risultati la tastiera si chiude da sola
+    LaunchedEffect(gridState.isScrollInProgress) {
+        if (gridState.isScrollInProgress) focus.clearFocus()
+    }
 
     val selecting = selection.isNotEmpty()
     BackHandler(enabled = selecting) { vm.clearSelection() }
@@ -273,7 +277,7 @@ fun HomeScreen(
             }
             if (search.resultCount >= 0 && (text.isNotEmpty() || !chips.isEmpty)) {
                 Text(
-                    "${Format.count(search.resultCount)} risultati",
+                    Format.plural(search.resultCount, "risultato", "risultati"),
                     Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelMedium,
                 )

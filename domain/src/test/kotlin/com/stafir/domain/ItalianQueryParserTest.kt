@@ -114,4 +114,12 @@ class ItalianQueryParserTest {
         assertNull(q.dateRange)
         assertEquals(listOf("mar"), q.freeText)
     }
+
+    @Test fun commandObjectsAreNotSearchWords() {
+        val q = parser.parse("crea un carosello del mare")
+        assertEquals("crea", q.command!!.verb)
+        assertTrue(q.freeText.isEmpty())
+        assertEquals("sea", q.concepts.single().id)
+        assertEquals("⚙️ Comando: crea", q.explain().first())
+    }
 }

@@ -133,8 +133,10 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun resolve(t: String, c: SearchQuery): SearchQuery {
         val parsed = currentParser().parse(t)
         var q = parsed.mergedWith(c)
-        var notice: String? = parsed.command?.let {
-            "Ho capito il comando «${it.verb}» (${it.description}). Arriverà in una prossima fase: intanto ti mostro i file a cui si applicherebbe."
+        val notices = mutableListOf<String>()
+        parsed.command?.let {
+            notices += "Ho capito il comando «${it.verb}» (${it.description}): arriverà in una prossima fase. " +
+                "Intanto ti mostro i file a cui si applicherebbe."
         }
         val minConf = settings.current.minConfidence
         var count = dao.countRaw(SearchSqlBuilder.count(q, minConf))
@@ -142,10 +144,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             val words = q.freeText.joinToString(", ") { "«$it»" }
             q = q.copy(freeText = emptyList())
             count = dao.countRaw(SearchSqlBuilder.count(q, minConf))
-            notice = "Non ho trovato $words. Se sono nomi di persone, il riconoscimento dei volti arriva nella prossima fase. " +
+            notices += "Non ho trovato $words. Se sono nomi di persone, il riconoscimento dei volti arriva nella prossima fase. " +
                 "Ecco i risultati senza ${if (parsed.freeText.size > 1) "queste parole" else "questa parola"}."
         }
-        _search.value = SearchUi(understood = parsed.explain(), notice = notice, resultCount = count)
+        _search.value = SearchUi(
+            understood = parsed.explain(),
+            notice = notices.joinToString("\n").ifEmpty { null },
+            resultCount = count,
+        )
         return q
     }
 

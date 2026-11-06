@@ -65,6 +65,7 @@ data class SearchQuery(
 
     /** Spiegazione leggibile di cosa è stato capito, mostrata come "Ho capito: ...". */
     fun explain(): List<String> = buildList {
+        command?.let { add("⚙️ Comando: ${it.verb}") }
         when (mediaType) {
             MediaTypeFilter.PHOTOS -> add("Solo foto")
             MediaTypeFilter.VIDEOS -> add("Solo video")

@@ -97,8 +97,9 @@ class ItalianQueryParser(
             }
             if (matchedPlace) continue
 
-            // 7) Parole vuote
+            // 7) Parole vuote (e, se c'è un comando, ciò che il comando crea: "carosello", "album"...)
             if (t in STOPWORDS || t.all { it.isDigit() }) { i++; continue }
+            if (command != null && t in COMMAND_OBJECTS) { i++; continue }
 
             // 8) Concetti (scene, soggetti, documenti...)
             val concept = Vocabulary.conceptForWord(t) ?: singularCandidates(t).firstNotNullOfOrNull { Vocabulary.conceptForWord(it) }
@@ -184,6 +185,13 @@ class ItalianQueryParser(
             "condividi" to CommandIntent("condividi", "Condividere", 6),
             "proponi" to CommandIntent("proponi", "Proporre foto da eliminare o migliori scatti", 5),
             "ogni" to CommandIntent("automazione", "Automazioni \"se succede questo, fai quello\"", 7),
+        )
+
+        /** Oggetti dei comandi: non sono parole da cercare nelle foto. */
+        val COMMAND_OBJECTS: Set<String> = setOf(
+            "carosello", "caroselli", "storia", "storie", "reel", "collage", "presentazione", "album",
+            "cartella", "cartelle", "privata", "privato", "cestino", "jpg", "jpeg", "heic", "png", "formato",
+            "instagram", "post", "didascalia", "hashtag", "nuovo", "nuova", "nuovi", "nuove", "settimana",
         )
 
         val STOPWORDS: Set<String> = setOf(

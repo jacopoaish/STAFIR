@@ -213,7 +213,7 @@ private fun StartStep(onFinished: () -> Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(Format.count(n.total), style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
-                    Text("elementi trovati", style = MaterialTheme.typography.titleMedium)
+                    Text(if (n.total == 1) "elemento trovato" else "elementi trovati", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "${Format.count(n.photos)} foto (${Format.bytes(n.photoBytes)})\n${Format.count(n.videos)} video (${Format.bytes(n.videoBytes)})",

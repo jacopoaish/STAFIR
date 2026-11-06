@@ -10,6 +10,9 @@ object Format {
     private val number = NumberFormat.getIntegerInstance(it)
 
     fun count(n: Int): String = number.format(n)
+
+    /** "1 risultato", "3 risultati". */
+    fun plural(n: Int, one: String, many: String): String = "${count(n)} ${if (n == 1) one else many}"
     fun count(n: Long): String = number.format(n)
 
     fun bytes(b: Long): String {
