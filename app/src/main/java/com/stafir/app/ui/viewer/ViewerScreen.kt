@@ -134,7 +134,7 @@ fun ViewerScreen(vm: GalleryViewModel, startIndex: Int, onBack: () -> Unit, onPe
             }
         }
 
-        val current = items.peek(pager.currentPage.coerceIn(0, (items.itemCount - 1).coerceAtLeast(0)))
+        val current = items.itemSnapshotList.getOrNull(pager.currentPage)
         AnimatedVisibility(chrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
             Row(
                 Modifier.fillMaxWidth()

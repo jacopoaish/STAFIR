@@ -557,7 +557,8 @@ private fun MediaGrid(
         ) {
             val key = items.itemKey { it.id }
             val cell: @Composable (Int) -> Unit = { index ->
-                val m = items[index]
+                // durante un cambio di risultati la griglia può chiedere per un attimo una posizione che non c'è più
+                val m = if (index < items.itemCount) items[index] else null
                 if (m == null) {
                     Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainer))
                 } else {
@@ -575,7 +576,8 @@ private fun MediaGrid(
                     )
                 }
             }
-            if (!layout.headers) {
+            // leggere itemCount qui fa ricostruire la griglia appena cambia il numero di risultati
+            if (!layout.headers || layout.mediaCount != items.itemCount) {
                 items(count = items.itemCount, key = key, contentType = { "media" }) { index -> cell(index) }
             } else {
                 for (s in 0 until layout.sectionCount) {
@@ -596,7 +598,7 @@ private fun MediaGrid(
         }
         val label: (Int) -> String = { grid ->
             if (layout.headers) months.getOrNull(layout.sectionOfGrid(grid))?.let { Format.monthKey(it) } ?: ""
-            else items.peek(layout.mediaOfGrid(grid).coerceIn(0, (items.itemCount - 1).coerceAtLeast(0)))?.let { Format.monthYear(it.dateTaken) } ?: ""
+            else items.itemSnapshotList.getOrNull(layout.mediaOfGrid(grid))?.let { Format.monthYear(it.dateTaken) } ?: ""
         }
         var dragging by remember { mutableStateOf(false) }
         MonthPill(state, layout, label, hidden = dragging, modifier = Modifier.align(Alignment.TopCenter))
@@ -618,7 +620,7 @@ private fun MonthHeader(label: String, count: Int, selecting: Boolean, selected:
             IconButton(onClick = onToggle) {
                 Icon(
                     if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                    if (selected) "Deseleziona $label" else "Seleziona tutto $label",
+                    if (selected) "Deseleziona il mese $label" else "Seleziona il mese $label",
                     tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
