@@ -187,8 +187,8 @@ if tap "IMG_202503"; then
     if tap "Teodoro"; then shot 14g-volto 2; adb shell input keyevent 4 </dev/null; fi
   fi
 fi
-FACES_LOG=$(adb logcat -d </dev/null | grep -E "FaceRecognizer|FaceIndex" | tail -5)
-[ -n "$FACES_LOG" ] && log "Registro volti: $FACES_LOG"
+log "Registro volti:"
+adb logcat -d </dev/null | grep -E "FaceRecognizer|FaceIndex" | sed 's/^.*\(FaceRecognizer\|FaceIndex\)/\1/' | head -40 | while IFS= read -r l; do log "    $l"; done
 
 # 5) Visualizzatore e informazioni
 restart

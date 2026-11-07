@@ -68,6 +68,7 @@ class FaceRecognizer(context: Context) : AutoCloseable {
     suspend fun detect(bitmap: Bitmap): List<DetectedFace> {
         if (interpreter == null) return emptyList()
         val faces = detector.process(InputImage.fromBitmap(bitmap, 0)).await()
+        if (faces.isEmpty()) Log.i("FaceRecognizer", "nessun volto in ${bitmap.width}×${bitmap.height}")
         val w = bitmap.width.toFloat()
         val h = bitmap.height.toFloat()
         val out = mutableListOf<DetectedFace>()
@@ -77,7 +78,10 @@ class FaceRecognizer(context: Context) : AutoCloseable {
             val yaw = abs(f.headEulerAngleY)
             val pitch = abs(f.headEulerAngleX)
             // Volti troppo piccoli o di profilo danno impronte poco affidabili: meglio saltarli.
-            if (size < MIN_FACE_PX || yaw > 40f || pitch > 30f) continue
+            if (size < MIN_FACE_PX || yaw > 40f || pitch > 30f) {
+                Log.i("FaceRecognizer", "volto scartato: ${size.toInt()} px, girato ${yaw.toInt()}°/${pitch.toInt()}°")
+                continue
+            }
             val crop = alignedCrop(bitmap, b.exactCenterX(), b.exactCenterY(), max(b.width(), b.height()).toFloat(), f.headEulerAngleZ)
             val emb = try { embed(crop) } finally { crop.recycle() }
             val quality = (size / max(w, h)).coerceAtMost(1f) * (1f - yaw / 90f)

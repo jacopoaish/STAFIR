@@ -251,7 +251,7 @@ fun SettingsScreen(
                 if (FaceRecognizer.modelPresent(app)) "CPU · TFLite/XNNPACK, 4 thread" else "Modello non presente in questa build",
             )
             ModelRow("Luoghi", "GeoNames città >15.000 abitanti (incluso)", if (app.container.geocoder.isAvailable) "Pronto" else "Dati non presenti in questa build")
-            ModelRow("Comprensione frasi", "Analizzatore italiano a regole (Fase 1)", "< 1 ms per frase")
+            ModelRow("Comprensione frasi", "Analizzatore italiano a regole, riconosce anche i nomi delle persone", "< 1 ms per frase")
             Text(
                 "In arrivo: CLIP multilingue su NPU Hexagon per la ricerca per immagini, piccolo modello linguistico locale e OCR. " +
                     "Il «banco di prova» per confrontarli arriverà con le funzioni avanzate.",

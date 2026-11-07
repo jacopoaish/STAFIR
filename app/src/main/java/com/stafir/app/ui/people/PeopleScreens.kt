@@ -181,7 +181,7 @@ fun PersonScreen(vm: GalleryViewModel, personId: Long, onBack: () -> Unit, onOpe
     var menu by remember { mutableStateOf(false) }
     var notThis by remember { mutableStateOf<Long?>(null) }
     val named by produceState(emptyList<PersonName>(), naming) { value = vm.namedPeople() }
-    val label = person?.name ?: "Questa persona"
+    val label = person?.name ?: "questa persona"
 
     Scaffold(topBar = {
         TopAppBar(
@@ -250,8 +250,8 @@ fun PersonScreen(vm: GalleryViewModel, personId: Long, onBack: () -> Unit, onOpe
     notThis?.let { mediaId ->
         AlertDialog(
             onDismissRequest = { notThis = null },
-            title = { Text("Non è $label?") },
-            text = { Text("Tolgo questa foto da $label. Il volto diventerà una persona a parte, così potrai darle il nome giusto.") },
+            title = { Text("Non è ${person?.name ?: "questa persona"}?") },
+            text = { Text("Tolgo questa foto da ${person?.name ?: "questo gruppo"}. Il volto diventerà una persona a parte, così potrai darle il nome giusto.") },
             confirmButton = { Button(onClick = { vm.removePersonFromMedia(personId, mediaId); notThis = null }) { Text("Togli") } },
             dismissButton = { TextButton(onClick = { notThis = null }) { Text("Annulla") } },
         )

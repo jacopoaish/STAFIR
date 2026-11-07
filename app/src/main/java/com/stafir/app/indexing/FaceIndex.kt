@@ -69,9 +69,12 @@ class FaceIndex(private val db: StafirDatabase) {
             for (f in found.sortedByDescending { it.face.quality }) {
                 if (kept.none { FaceMath.cosine(it.face.embedding, f.face.embedding) > 0.7f }) kept += f
             }
+            val log = StringBuilder()
             for (f in kept) {
                 val v = f.face.embedding
                 val match = clusterer.bestMatch(v, g.values)
+                if (match != null) log.append(" [persona ${match.groupId}, somiglianza ${"%.2f".format(match.similarity)}]")
+                else log.append(" [nuova persona, più simile ${"%.2f".format(g.values.filter { it.count > 0 }.maxOfOrNull { FaceMath.cosine(v, it.centroid) } ?: 0f)}]")
                 val pid = match?.groupId ?: fd.insertPerson(
                     PersonEntity(name = null, centroid = FaceMath.toBytes(FloatArray(v.size)), faceCount = 0, coverFaceId = null, hidden = false, updatedAt = System.currentTimeMillis()),
                 ).also { g[it] = FaceGroup(it, FloatArray(v.size), 0, false) }
@@ -92,7 +95,7 @@ class FaceIndex(private val db: StafirDatabase) {
                 touched += pid
             }
             touched.forEach { save(it) }
-            if (found.isNotEmpty()) Log.i(TAG, "file $mediaId: ${kept.size} volti → persone ${touched.joinToString()}")
+            if (found.isNotEmpty()) Log.i(TAG, "file $mediaId: ${kept.size} volti$log")
         }
     }
 
