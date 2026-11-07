@@ -273,6 +273,10 @@ fun SettingsScreen(
             SectionTitle("Informazioni")
             Text("Stafir ${BuildConfigInfo.versionName(ctx)} · analisi v${AnalysisPipeline.VERSION}", style = MaterialTheme.typography.bodySmall)
             Text("Dispositivo: ${DeviceHelper.deviceName}", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Immagini dell'icona: ESA/Hubble, ESA/Webb, EHT Collaboration (CC BY 4.0); NASA; foto CC0 da Stocksnap e Rawpixel.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
