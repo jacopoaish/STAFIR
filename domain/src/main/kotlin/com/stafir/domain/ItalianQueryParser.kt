@@ -21,6 +21,22 @@ fun interface PlaceDirectory {
     }
 }
 
+/** Persone con un nome (dai volti riconosciuti), per riconoscerle nelle frasi. */
+fun interface PersonDirectory {
+    /** [normalizedPhrase] è già normalizzata (minuscolo, senza accenti). */
+    fun lookup(normalizedPhrase: String): PersonFilter?
+
+    companion object {
+        val EMPTY = PersonDirectory { null }
+
+        fun of(people: Collection<PersonFilter>): PersonDirectory {
+            val map = HashMap<String, PersonFilter>()
+            people.forEach { map.putIfAbsent(TextNormalizer.normalize(it.name), it) }
+            return PersonDirectory { map[it] }
+        }
+    }
+}
+
 /**
  * Comprende frasi in italiano naturale e le trasforma in una [SearchQuery] strutturata.
  *
@@ -31,6 +47,7 @@ fun interface PlaceDirectory {
 class ItalianQueryParser(
     private val places: PlaceDirectory = PlaceDirectory.EMPTY,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    private val people: PersonDirectory = PersonDirectory.EMPTY,
     private val today: () -> LocalDate = { LocalDate.now(zone) },
 ) {
 
@@ -43,6 +60,7 @@ class ItalianQueryParser(
         var dateRange: DateRange? = null
         val sources = linkedSetOf<Source>()
         val placeFilters = mutableListOf<PlaceFilter>()
+        val personFilters = mutableListOf<PersonFilter>()
         val concepts = mutableListOf<Concept>()
         var favorites = false
         val free = mutableListOf<String>()
@@ -83,6 +101,16 @@ class ItalianQueryParser(
 
             // 5) Preferiti
             if (t in FAVORITE_WORDS) { favorites = true; i++; continue }
+
+            // 5b) Persone con un nome (anche di più parole: "zia maria"): hanno la precedenza sulle altre parole
+            var matchedPerson = false
+            for (len in 3 downTo 1) {
+                if (i + len <= tokens.size) {
+                    val p = people.lookup(tokens.subList(i, i + len).joinToString(" "))
+                    if (p != null) { personFilters += p; i += len; matchedPerson = true; break }
+                }
+            }
+            if (matchedPerson) continue
 
             // 6) Luoghi su più parole ("reggio emilia", "stati uniti")
             var matchedPlace = false
@@ -127,6 +155,7 @@ class ItalianQueryParser(
             dateRange = dateRange,
             sources = sources,
             places = placeFilters.distinct(),
+            people = personFilters.distinctBy { it.id },
             concepts = concepts,
             favoritesOnly = favorites,
             freeText = free.distinct(),

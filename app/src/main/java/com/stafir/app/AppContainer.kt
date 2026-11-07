@@ -1,6 +1,7 @@
 package com.stafir.app
 
 import android.content.Context
+import com.stafir.app.indexing.FaceIndex
 import com.stafir.app.indexing.IndexScheduler
 import com.stafir.app.quality.QualityStore
 import com.stafir.core.db.StafirDatabase
@@ -8,6 +9,8 @@ import com.stafir.core.geo.ItalianNames
 import com.stafir.core.geo.OfflineGeocoder
 import com.stafir.core.media.MediaStoreSync
 import com.stafir.domain.ItalianQueryParser
+import com.stafir.domain.PersonDirectory
+import com.stafir.domain.PersonFilter
 import com.stafir.domain.PlaceDirectory
 import com.stafir.domain.PlaceFilter
 import com.stafir.domain.PlaceLevel
@@ -20,6 +23,7 @@ class AppContainer(val context: Context) {
     val geocoder: OfflineGeocoder by lazy { OfflineGeocoder(context) }
     val scheduler: IndexScheduler by lazy { IndexScheduler(context, settings) }
     val quality: QualityStore by lazy { QualityStore(context) }
+    val faceIndex: FaceIndex by lazy { FaceIndex(database) }
 
     /** Costruisce il parser con i luoghi presenti nell'archivio. */
     suspend fun buildParser(): ItalianQueryParser {
@@ -31,6 +35,7 @@ class AppContainer(val context: Context) {
         val aliases = ItalianNames.searchAliases.mapNotNull { (alias, italian) ->
             known[italian]?.let { alias to it }
         }.toMap()
-        return ItalianQueryParser(PlaceDirectory.of(places, aliases))
+        val people = database.faceDao().namedPeople().map { PersonFilter(it.id, it.name) }
+        return ItalianQueryParser(PlaceDirectory.of(places, aliases), people = PersonDirectory.of(people))
     }
 }

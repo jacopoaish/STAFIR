@@ -10,3 +10,7 @@
 -dontwarn javax.annotation.**
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn org.checkerframework.**
+
+# TensorFlow Lite (riconoscimento volti)
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**

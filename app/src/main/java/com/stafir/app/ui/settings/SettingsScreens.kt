@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
@@ -66,6 +67,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.stafir.ai.FaceRecognizer
 import com.stafir.app.BuildConfigInfo
 import com.stafir.app.StafirApp
 import com.stafir.app.indexing.AnalysisPipeline
@@ -159,6 +161,10 @@ fun SettingsScreen(
         ToggleRow(Icons.Filled.Landscape, "Scene e oggetti", "Mare, montagna, cibo, animali, documenti…", s.recognizeScenes) { settings.setRecognizeScenes(it) }
         ToggleRow(Icons.Filled.Place, "Luoghi", "Città, regione e paese dal GPS, senza internet", s.recognizePlaces) { settings.setRecognizePlaces(it) }
         ToggleRow(Icons.Filled.Videocam, "Video", "3 fotogrammi chiave per ogni video", s.recognizeVideos) { settings.setRecognizeVideos(it) }
+        ToggleRow(Icons.Filled.Face, "Volti e persone", "Raggruppa le foto della stessa persona, solo sul telefono", s.recognizeFaces) {
+            settings.setRecognizeFaces(it)
+            app.container.scheduler.scheduleAnalysis(now = false)
+        }
         ToggleRow(Icons.Filled.BatteryChargingFull, "Solo in carica", "Consigliato: l'analisi automatica parte quando il telefono è in carica", s.onlyWhileCharging) {
             settings.setOnlyWhileCharging(it)
             app.container.scheduler.scheduleAnalysis(now = false)
@@ -239,10 +245,15 @@ fun SettingsScreen(
 
             SectionTitle("Modelli in uso")
             ModelRow("Scene e oggetti", "Google ML Kit Image Labeling (incluso, 400+ categorie)", "CPU · TFLite/XNNPACK")
+            ModelRow(
+                "Volti",
+                "Google ML Kit Face Detection + FaceNet 128-d (Apache 2.0, incluso)",
+                if (FaceRecognizer.modelPresent(app)) "CPU · TFLite/XNNPACK, 4 thread" else "Modello non presente in questa build",
+            )
             ModelRow("Luoghi", "GeoNames città >15.000 abitanti (incluso)", if (app.container.geocoder.isAvailable) "Pronto" else "Dati non presenti in questa build")
             ModelRow("Comprensione frasi", "Analizzatore italiano a regole (Fase 1)", "< 1 ms per frase")
             Text(
-                "In arrivo: CLIP multilingue su NPU Hexagon per la ricerca per immagini, piccolo modello linguistico locale, volti e OCR. " +
+                "In arrivo: CLIP multilingue su NPU Hexagon per la ricerca per immagini, piccolo modello linguistico locale e OCR. " +
                     "Il «banco di prova» per confrontarli arriverà con le funzioni avanzate.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

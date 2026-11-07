@@ -166,10 +166,10 @@ private fun ChooseStep(onNext: () -> Unit) {
         ToggleRow(Icons.Filled.Landscape, "Scene e oggetti", "Mare, montagna, cibo, animali, città, documenti…", s.recognizeScenes) { settings.setRecognizeScenes(it) }
         ToggleRow(Icons.Filled.Place, "Luoghi", "Città, regione e paese dal GPS, senza internet", s.recognizePlaces) { settings.setRecognizePlaces(it) }
         ToggleRow(Icons.Filled.Videocam, "Video", "Analizza 3 fotogrammi chiave per ogni video", s.recognizeVideos) { settings.setRecognizeVideos(it) }
+        ToggleRow(Icons.Filled.Face, "Volti e persone", "Raggruppa le foto della stessa persona. Le impronte dei volti restano solo sul telefono", s.recognizeFaces) { settings.setRecognizeFaces(it) }
         ToggleRow(Icons.Filled.BatteryChargingFull, "Solo in carica", "Il riconoscimento dell'intero archivio avviene mentre il telefono è in carica", s.onlyWhileCharging) { settings.setOnlyWhileCharging(it) }
         Spacer(Modifier.height(8.dp))
         Text("In arrivo nelle prossime fasi", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
-        ToggleRow(Icons.Filled.Face, "Volti e persone", "Fase 2", false, enabled = false) {}
         ToggleRow(Icons.Filled.Description, "Testo, scontrini e documenti (OCR)", "Fase 3", false, enabled = false) {}
         Spacer(Modifier.height(24.dp))
         Button(onClick = onNext, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Avanti") }

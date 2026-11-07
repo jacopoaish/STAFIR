@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -56,6 +57,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -128,6 +130,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onStats: () -> Unit,
     onBatteryGuide: () -> Unit,
+    onPeople: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val items = vm.paging.collectAsLazyPagingItems()
@@ -238,9 +241,10 @@ fun HomeScreen(
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
                         )
+                        IconButton(onClick = onPeople) { Icon(Icons.Filled.People, "Tutte le persone") }
                         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Impostazioni") }
                     }
-                    FilterRow(vm)
+                    FilterRow(vm, onPeople)
                 }
             }
         },
@@ -307,7 +311,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun FilterRow(vm: GalleryViewModel) {
+private fun FilterRow(vm: GalleryViewModel, onPeople: () -> Unit) {
     val chips by vm.chips.collectAsStateWithLifecycle()
     val options by vm.options.collectAsStateWithLifecycle()
     Row(
@@ -317,6 +321,20 @@ private fun FilterRow(vm: GalleryViewModel) {
         FilterChip(selected = chips.mediaType == MediaTypeFilter.PHOTOS, onClick = { vm.toggleType(MediaTypeFilter.PHOTOS) }, label = { Text("Foto") })
         FilterChip(selected = chips.mediaType == MediaTypeFilter.VIDEOS, onClick = { vm.toggleType(MediaTypeFilter.VIDEOS) }, label = { Text("Video") })
         FilterChip(selected = chips.favoritesOnly, onClick = { vm.toggleFavorites() }, label = { Text("Preferiti") })
+        DropChip("Persone", chips.people.size) { close ->
+            if (options.people.isEmpty()) {
+                DropdownMenuItem(text = { Text("Nessuna persona con un nome, per ora") }, onClick = {}, enabled = false)
+            }
+            options.people.forEach { p ->
+                DropdownMenuItem(
+                    text = { Text("👤  ${p.name}") },
+                    trailingIcon = { if (chips.people.any { it.id == p.id }) Icon(Icons.Filled.CheckCircle, null) },
+                    onClick = { vm.togglePerson(p) },
+                )
+            }
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text("Tutte le persone…") }, onClick = { close(); onPeople() })
+        }
         DropChip("Categorie", chips.concepts.size) { close ->
             Vocabulary.concepts.forEach { c ->
                 DropdownMenuItem(
@@ -354,7 +372,6 @@ private fun FilterRow(vm: GalleryViewModel) {
                 )
             }
         }
-        FilterChip(selected = false, enabled = false, onClick = {}, label = { Text("Persone · presto") })
     }
 }
 
@@ -399,6 +416,7 @@ private fun AnalysisCard(a: AnalysisUi, onNow: () -> Unit, onStop: () -> Unit, o
             Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 4.dp)) {
                 val title = when {
                     a.tooHot -> "In pausa: il telefono è caldo"
+                    a.running && a.facesPending > 0 && a.pending <= a.facesPending -> "Ricerca dei volti in corso"
                     a.running -> "Riconoscimento in corso"
                     a.waitingForCharge -> "In attesa della ricarica"
                     else -> "Da riconoscere"

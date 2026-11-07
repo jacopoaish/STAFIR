@@ -2,9 +2,9 @@
 
 Galleria intelligente per Android: gestisce, riconosce, classifica e cerca **tutte le foto e i video del telefono**, con ricerca in **italiano naturale** e intelligenza artificiale **che gira solo sul telefono**.
 
-## Come provare l'app (Fase 1)
+## Come provare l'app (Fase 2)
 
-1. Dal telefono apri la pagina **Releases** di questo repository e scarica l'ultimo file `Stafir-fase1-buildN.apk`.
+1. Dal telefono apri la pagina **Releases** di questo repository e scarica l'ultimo file `Stafir-fase2-buildN.apk`.
 2. Tocca il file scaricato → consenti l'installazione da questa fonte se richiesto → **Installa**.
 3. Ogni nuova build si installa sopra la precedente (stessa firma), senza perdere i dati.
 
@@ -27,12 +27,23 @@ Galleria intelligente per Android: gestisce, riconosce, classifica e cerca **tut
 | Banco qualità: etichetti a mano alcune tue foto e misuri precisione, richiamo e tempi | ✅ |
 | Riconoscimento comandi ("crea…", "sposta…"): capiti e spiegati, eseguiti nelle prossime fasi | 🟡 |
 
+## Cosa aggiunge la Fase 2 – Volti e persone
+
+| Funzione | Stato |
+|---|---|
+| Rilevamento volti su foto e fotogrammi chiave dei video (ML Kit Face Detection, sul telefono) | ✅ |
+| Impronta del volto (FaceNet 128-d, TFLite, Apache 2.0) e raggruppamento automatico della stessa persona | ✅ |
+| Schermata «Persone» con i volti; nome dato una volta vale per tutte le foto e i video | ✅ |
+| Correzioni: «non è lui/lei», «è un'altra persona», unisci, nascondi; le correzioni non vengono annullate dall'analisi | ✅ |
+| Ricerca per nome in italiano («Marco al mare nel 2023») e filtro «Persone» | ✅ |
+| Le foto già analizzate in Fase 1 vengono ripassate solo per i volti (in carica) | ✅ |
+
 ## Architettura (moduli separati)
 
 ```
 domain/  Kotlin puro, testabile senza telefono: parser italiano, vocabolario concetti, provenienza
 core/    Database (Room + FTS), sincronizzazione con MediaStore, ricerca SQL, geocoder offline
-ai/      Riconoscitori (interfaccia ImageRecognizer): ML Kit scene; in futuro volti, OCR, CLIP…
+ai/      Riconoscitori: ML Kit scene, volti (ML Kit + FaceNet); in futuro OCR, CLIP…
 app/     Interfaccia (Jetpack Compose, Material 3), worker in background, impostazioni
 ```
 
@@ -47,7 +58,7 @@ app/     Interfaccia (Jetpack Compose, Material 3), worker in background, impost
 | Scene/oggetti | Google ML Kit Image Labeling (incluso nell'APK, offline) | CLIP multilingue (es. MobileCLIP/SigLIP) su NPU Hexagon via LiteRT/QNN per la ricerca "per immagini" |
 | Comprensione frasi | Analizzatore italiano a regole (< 1 ms) | Piccolo LLM locale (es. Gemma 1–2B quantizzato) per frasi complesse e comandi |
 | Luoghi | GeoNames città > 15.000 ab. (CC BY 4.0), incluso | — |
-| Volti | — | Fase 2: rilevamento + embedding volti, raggruppamento |
+| Volti | Fase 2: ML Kit Face Detection + FaceNet 128-d (TFLite, scaricato in compilazione e incluso nell'APK) | Modello più leggero su NPU |
 | Testo/scontrini | — | Fase 3: OCR on-device |
 
 ## Sviluppo

@@ -13,6 +13,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
+import com.stafir.app.indexing.AnalysisPipeline
 import com.stafir.app.system.Permissions
 import com.stafir.app.ui.common.ThumbnailFetcher
 import kotlinx.coroutines.CoroutineScope
@@ -65,7 +66,7 @@ class StafirApp : Application(), SingletonImageLoader.Factory {
                 container.mediaSync.sync()
                 _syncTick.value = System.currentTimeMillis()
                 val s = container.settings.current
-                if (s.onboardingDone && container.database.mediaDao().pendingCount(s.recognizeVideos) > 0) {
+                if (s.onboardingDone && container.database.mediaDao().pendingCount(s.recognizeVideos, if (s.recognizeFaces) AnalysisPipeline.FACES_VERSION else 0) > 0) {
                     // KEEP: non disturba un'analisi già in corso o in attesa della carica.
                     container.scheduler.scheduleAnalysis(now = false)
                 }
@@ -90,6 +91,8 @@ class StafirApp : Application(), SingletonImageLoader.Factory {
             .components {
                 add(ThumbnailFetcher.Factory())
                 add(ThumbnailFetcher.Key())
+                add(com.stafir.app.ui.common.FaceThumbFetcher.Factory())
+                add(com.stafir.app.ui.common.FaceThumbFetcher.Key())
                 add(VideoFrameDecoder.Factory())
             }
             .crossfade(150)

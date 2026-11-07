@@ -51,22 +51,33 @@ interface MediaDao {
     @Query("DELETE FROM media_fts WHERE rowid IN (:ids)")
     suspend fun deleteFtsFor(ids: List<Long>)
 
+    @Query("DELETE FROM face WHERE mediaId IN (:ids)")
+    suspend fun deleteFacesFor(ids: List<Long>)
+
     @Transaction
     suspend fun deleteCompletely(ids: List<Long>) {
         ids.chunked(500).forEach { chunk ->
             deleteLabelsFor(chunk)
             deleteFtsFor(chunk)
+            deleteFacesFor(chunk)
             deleteMedia(chunk)
         }
     }
 
     // ---------- Analisi ----------
 
-    @Query("SELECT * FROM media WHERE analysisState = 0 AND (:includeVideos OR isVideo = 0) ORDER BY dateTaken DESC LIMIT :limit")
-    suspend fun pendingBatch(limit: Int, includeVideos: Boolean): List<MediaEntity>
+    /** Da analizzare: file nuovi, oppure già analizzati ma senza il riconoscimento volti aggiornato. */
+    @Query(
+        """SELECT * FROM media WHERE (analysisState = 0 OR (:facesVersion > 0 AND analysisState = 1 AND facesVersion < :facesVersion))
+           AND (:includeVideos OR isVideo = 0) ORDER BY dateTaken DESC LIMIT :limit""",
+    )
+    suspend fun pendingBatch(limit: Int, includeVideos: Boolean, facesVersion: Int = 0): List<MediaEntity>
 
-    @Query("SELECT COUNT(*) FROM media WHERE analysisState = 0 AND (:includeVideos OR isVideo = 0)")
-    suspend fun pendingCount(includeVideos: Boolean): Int
+    @Query(
+        """SELECT COUNT(*) FROM media WHERE (analysisState = 0 OR (:facesVersion > 0 AND analysisState = 1 AND facesVersion < :facesVersion))
+           AND (:includeVideos OR isVideo = 0)""",
+    )
+    suspend fun pendingCount(includeVideos: Boolean, facesVersion: Int = 0): Int
 
     @Query(
         """UPDATE media SET analysisState = :state, analysisVersion = :version, analysisError = :error,
@@ -104,6 +115,9 @@ interface MediaDao {
             dateTaken = media.dateTaken, dateEstimated = media.dateEstimated,
         )
     }
+
+    @Query("SELECT COUNT(*) FROM media WHERE analysisState = 1 AND facesVersion < :facesVersion AND (:includeVideos OR isVideo = 0)")
+    suspend fun facesPendingCount(facesVersion: Int, includeVideos: Boolean): Int
 
     @Query("UPDATE media SET analysisState = -1, analysisError = :error, analyzedAt = :at WHERE id = :id")
     suspend fun markFailed(id: Long, error: String, at: Long = System.currentTimeMillis())

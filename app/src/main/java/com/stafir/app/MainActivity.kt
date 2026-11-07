@@ -21,6 +21,8 @@ import com.stafir.app.system.Permissions
 import com.stafir.app.ui.GalleryViewModel
 import com.stafir.app.ui.home.HomeScreen
 import com.stafir.app.ui.onboarding.OnboardingScreen
+import com.stafir.app.ui.people.PeopleScreen
+import com.stafir.app.ui.people.PersonScreen
 import com.stafir.app.ui.settings.BatteryGuideScreen
 import com.stafir.app.ui.settings.QualityScreen
 import com.stafir.app.ui.settings.SettingsScreen
@@ -68,6 +70,7 @@ class MainActivity : ComponentActivity() {
                             onSettings = { nav.navigate("settings") },
                             onStats = { nav.navigate("stats") },
                             onBatteryGuide = { nav.navigate("battery") },
+                            onPeople = { nav.navigate("people") },
                         )
                     }
                     composable(
@@ -78,6 +81,35 @@ class MainActivity : ComponentActivity() {
                             vm = gallery,
                             startIndex = entry.arguments?.getInt("index") ?: 0,
                             onBack = { nav.popBackStack() },
+                            onPerson = { id -> nav.navigate("person/$id") },
+                        )
+                    }
+                    composable("people") {
+                        PeopleScreen(vm = gallery, onBack = { nav.popBackStack() }, onPerson = { id -> nav.navigate("person/$id") })
+                    }
+                    composable("person/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                        val id = entry.arguments?.getLong("id") ?: 0L
+                        PersonScreen(
+                            vm = gallery,
+                            personId = id,
+                            onBack = { nav.popBackStack() },
+                            onOpen = { index -> nav.navigate("person/$id/viewer/$index") },
+                            onSwitchPerson = { other ->
+                                nav.navigate("person/$other") { popUpTo("person/{id}") { inclusive = true } }
+                            },
+                        )
+                    }
+                    composable(
+                        "person/{id}/viewer/{index}",
+                        arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("index") { type = NavType.IntType }),
+                    ) { entry ->
+                        val id = entry.arguments?.getLong("id") ?: 0L
+                        ViewerScreen(
+                            vm = gallery,
+                            startIndex = entry.arguments?.getInt("index") ?: 0,
+                            onBack = { nav.popBackStack() },
+                            onPerson = { other -> if (other == id) nav.popBackStack() else nav.navigate("person/$other") },
+                            personId = id,
                         )
                     }
                     composable("settings") {

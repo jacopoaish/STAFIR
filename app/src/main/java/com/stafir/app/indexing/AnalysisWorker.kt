@@ -49,13 +49,15 @@ class AnalysisWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         }
 
         val s = settings.current
-        val total = dao.pendingCount(s.recognizeVideos)
+        val pipeline = AnalysisPipeline(container)
+        val fv = if (pipeline.facesEnabled(s)) AnalysisPipeline.FACES_VERSION else 0
+        val total = dao.pendingCount(s.recognizeVideos, fv)
         if (total == 0) {
+            pipeline.close()
             settings.analysisRunning = false
             return Result.success()
         }
         settings.analysisRunning = true
-        val pipeline = AnalysisPipeline(container)
         val power = applicationContext.getSystemService(PowerManager::class.java)
         val battery = applicationContext.getSystemService(BatteryManager::class.java)
         val limit = inputData.getInt(KEY_LIMIT, 0)
@@ -86,8 +88,13 @@ class AnalysisWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 }
 
                 val current = settings.current
-                val batch = dao.pendingBatch(BATCH, current.recognizeVideos)
-                if (batch.isEmpty()) break
+                val cfv = if (pipeline.facesEnabled(current)) AnalysisPipeline.FACES_VERSION else 0
+                val batch = dao.pendingBatch(BATCH, current.recognizeVideos, cfv)
+                if (batch.isEmpty()) {
+                    // fine: unisce i gruppi della stessa persona rimasti separati
+                    if (cfv > 0) container.faceIndex.mergePass()
+                    break
+                }
 
                 coroutineScope {
                     batch.map { item ->

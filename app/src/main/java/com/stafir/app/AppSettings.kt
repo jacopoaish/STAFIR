@@ -14,6 +14,7 @@ class AppSettings(context: Context) {
         val recognizeScenes: Boolean,
         val recognizePlaces: Boolean,
         val recognizeVideos: Boolean,
+        val recognizeFaces: Boolean,
         val onlyWhileCharging: Boolean,
         val minConfidence: Float,
         val gridColumns: Int,
@@ -30,6 +31,7 @@ class AppSettings(context: Context) {
         recognizeScenes = prefs.getBoolean("recognizeScenes", true),
         recognizePlaces = prefs.getBoolean("recognizePlaces", true),
         recognizeVideos = prefs.getBoolean("recognizeVideos", true),
+        recognizeFaces = prefs.getBoolean("recognizeFaces", true),
         onlyWhileCharging = prefs.getBoolean("onlyWhileCharging", true),
         minConfidence = prefs.getFloat("minConfidence", 0.6f),
         gridColumns = prefs.getInt("gridColumns", 4),
@@ -46,6 +48,7 @@ class AppSettings(context: Context) {
     fun setRecognizeScenes(v: Boolean) = update { putBoolean("recognizeScenes", v) }
     fun setRecognizePlaces(v: Boolean) = update { putBoolean("recognizePlaces", v) }
     fun setRecognizeVideos(v: Boolean) = update { putBoolean("recognizeVideos", v) }
+    fun setRecognizeFaces(v: Boolean) = update { putBoolean("recognizeFaces", v) }
     fun setOnlyWhileCharging(v: Boolean) = update { putBoolean("onlyWhileCharging", v) }
     fun setMinConfidence(v: Float) = update { putFloat("minConfidence", v) }
     fun setGridColumns(v: Int) = update { putInt("gridColumns", v.coerceIn(2, 7)) }

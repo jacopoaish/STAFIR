@@ -27,6 +27,9 @@ enum class PlaceLevel { CITY, REGION, COUNTRY }
 
 data class PlaceFilter(val level: PlaceLevel, val value: String)
 
+/** Una persona a cui l'utente ha dato un nome (i suoi volti sono riconosciuti in foto e video). */
+data class PersonFilter(val id: Long, val name: String)
+
 /**
  * Comando riconosciuto nella barra (es. "crea un carosello...").
  * In Fase 1 i comandi vengono riconosciuti e spiegati; l'esecuzione arriva nelle fasi successive.
@@ -42,6 +45,8 @@ data class SearchQuery(
     val dateRange: DateRange? = null,
     val sources: Set<Source> = emptySet(),
     val places: List<PlaceFilter> = emptyList(),
+    /** Tutte le persone indicate devono comparire nella foto/video. */
+    val people: List<PersonFilter> = emptyList(),
     val concepts: List<Concept> = emptyList(),
     val favoritesOnly: Boolean = false,
     val freeText: List<String> = emptyList(),
@@ -49,7 +54,7 @@ data class SearchQuery(
 ) {
     val isEmpty: Boolean
         get() = mediaType == MediaTypeFilter.ANY && dateRange == null && sources.isEmpty() &&
-            places.isEmpty() && concepts.isEmpty() && !favoritesOnly && freeText.isEmpty()
+            places.isEmpty() && people.isEmpty() && concepts.isEmpty() && !favoritesOnly && freeText.isEmpty()
 
     /** Unisce due ricerche (es. testo scritto + filtri toccati). */
     fun mergedWith(other: SearchQuery): SearchQuery = SearchQuery(
@@ -57,6 +62,7 @@ data class SearchQuery(
         dateRange = other.dateRange ?: dateRange,
         sources = sources + other.sources,
         places = (places + other.places).distinct(),
+        people = (people + other.people).distinctBy { it.id },
         concepts = (concepts + other.concepts).distinctBy { it.id },
         favoritesOnly = favoritesOnly || other.favoritesOnly,
         freeText = (freeText + other.freeText).distinct(),
@@ -71,6 +77,7 @@ data class SearchQuery(
             MediaTypeFilter.VIDEOS -> add("Solo video")
             MediaTypeFilter.ANY -> {}
         }
+        people.forEach { add("👤 ${it.name}") }
         concepts.forEach { add(it.italianName) }
         places.forEach { add("📍 ${it.value}") }
         dateRange?.let { add("📅 ${it.label}") }

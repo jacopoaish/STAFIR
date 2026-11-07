@@ -40,6 +40,10 @@ object SearchSqlBuilder {
             clauses += "(" + parts.joinToString(" OR ") + ")"
         }
         if (q.favoritesOnly) clauses += "isFavorite = 1"
+        q.people.forEach { person ->
+            clauses += "id IN (SELECT mediaId FROM face WHERE personId = ?)"
+            args.add(person.id)
+        }
         q.concepts.forEach { concept ->
             if (concept.labels.isEmpty()) return@forEach
             clauses += "id IN (SELECT mediaId FROM media_label WHERE label IN (${concept.labels.joinToString(",") { "?" }}) AND confidence >= ?)"

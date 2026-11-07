@@ -13,6 +13,8 @@ work = "2.10.0"
 coil = "3.0.4"
 media3 = "1.5.1"
 mlkitLabeling = "17.0.9"
+mlkitFace = "16.1.7"
+tflite = "2.16.1"
 coroutines = "1.9.0"
 exif = "1.3.7"
 junit = "4.13.2"
@@ -44,6 +46,8 @@ coil-video = { module = "io.coil-kt.coil3:coil-video", version.ref = "coil" }
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
 media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 mlkit-image-labeling = { module = "com.google.mlkit:image-labeling", version.ref = "mlkitLabeling" }
+mlkit-face-detection = { module = "com.google.mlkit:face-detection", version.ref = "mlkitFace" }
+tflite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tflite" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }

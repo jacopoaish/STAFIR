@@ -20,6 +20,8 @@ dependencies {
     api(project(":domain"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.mlkit.image.labeling)
+    implementation(libs.mlkit.face.detection)
+    implementation(libs.tflite)
     implementation(libs.coroutines.android)
     implementation(libs.coroutines.play.services)
     testImplementation(libs.junit)

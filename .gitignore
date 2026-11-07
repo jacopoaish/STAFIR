@@ -7,3 +7,4 @@ local.properties
 captures/
 .kotlin/
 core/src/main/assets/geo/cities.tsv
+ai/src/main/assets/models/

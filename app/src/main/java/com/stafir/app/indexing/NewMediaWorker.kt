@@ -14,7 +14,8 @@ class NewMediaWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val container = (applicationContext as StafirApp).container
         return try {
             container.mediaSync.sync()
-            val pending = container.database.mediaDao().pendingCount(container.settings.current.recognizeVideos)
+            val st = container.settings.current
+            val pending = container.database.mediaDao().pendingCount(st.recognizeVideos, if (st.recognizeFaces) AnalysisPipeline.FACES_VERSION else 0)
             if (pending > 0 && container.settings.current.onboardingDone) {
                 container.scheduler.scheduleAnalysis(now = false)
             }

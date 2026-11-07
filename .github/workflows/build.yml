@@ -33,6 +33,26 @@ jobs:
         if: steps.geocache.outputs.cache-hit != 'true'
         run: python3 tools/build_geodata.py
 
+      - name: Cache modello volti
+        id: facecache
+        uses: actions/cache@v4
+        with:
+          path: ai/src/main/assets/models/facenet.tflite
+          key: facenet-128-d7c1f7f1
+
+      - name: Modello volti (FaceNet, Apache 2.0)
+        if: steps.facecache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ai/src/main/assets/models
+          for i in 1 2 3 4; do
+            curl -fsSL --retry 3 -o ai/src/main/assets/models/facenet.tflite \
+              https://raw.githubusercontent.com/shubham0204/FaceRecognition_With_FaceNet_Android/master/app/src/main/assets/facenet.tflite && break
+            sleep $((i * 5))
+          done
+
+      - name: Verifica modello volti
+        run: echo "d7c1f7f130376982c7004920ddc41925ac2e5aecf6522f476c8bbb3669db7013  ai/src/main/assets/models/facenet.tflite" | sha256sum -c -
+
       - name: Test automatici
         run: ./gradlew --no-daemon testDebugUnitTest :domain:test
 
@@ -42,7 +62,7 @@ jobs:
       - name: Prepara APK
         run: |
           mkdir -p out smoke-apk
-          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "out/Stafir-fase1-build${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "out/Stafir-fase2-build${{ github.run_number }}.apk"
           cp app/build/outputs/apk/release/app-x86_64-release.apk smoke-apk/
           ls -la out smoke-apk
 
@@ -158,14 +178,14 @@ jobs:
         run: |
           mkdir -p shots
           cd screens && zip -q ../shots/schermate-emulatore.zip *.png report.md && cd ..
-          { cat docs/PROVA_FASE1.md; echo; echo "---"; echo; cat screens/report.md; } > release-notes.md
+          { cat docs/PROVA_FASE2.md; echo; echo "---"; echo; cat screens/report.md; } > release-notes.md
           ls -la out shots
 
       - name: Pubblica APK scaricabile dal telefono (Release)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: "Stafir Fase 1 – build ${{ github.run_number }}"
+          name: "Stafir Fase 2 – build ${{ github.run_number }}"
           prerelease: false
           make_latest: true
           target_commitish: ${{ github.sha }}

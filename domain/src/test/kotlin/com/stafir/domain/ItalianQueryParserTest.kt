@@ -122,4 +122,16 @@ class ItalianQueryParserTest {
         assertEquals("sea", q.concepts.single().id)
         assertEquals("⚙️ Comando: crea", q.explain().first())
     }
+
+    @Test fun peopleByName() {
+        val withPeople = ItalianQueryParser(places, zone, PersonDirectory.of(listOf(PersonFilter(1, "Marco"), PersonFilter(2, "Zia Maria")))) { today }
+        val q = withPeople.parse("Marco al mare")
+        assertEquals(listOf(PersonFilter(1, "Marco")), q.people)
+        assertEquals("sea", q.concepts.single().id)
+        assertTrue(q.freeText.isEmpty())
+        val q2 = withPeople.parse("zia maria e marco a Roma nel 2024")
+        assertEquals(setOf(1L, 2L), q2.people.map { it.id }.toSet())
+        assertEquals(listOf(PlaceFilter(PlaceLevel.CITY, "Roma")), q2.places)
+        assertTrue(q2.explain().contains("👤 Marco"))
+    }
 }

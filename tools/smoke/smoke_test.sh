@@ -105,10 +105,10 @@ for line in "${FIXTURES[@]}"; do
   adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/$folder/$name" </dev/null >/dev/null 2>&1
 done
 for _ in $(seq 1 30); do
-  [ "$(media_count)" = "9 foto, 1 video" ] && break
+  [ "$(media_count)" = "18 foto, 1 video" ] && break
   sleep 2
 done
-log "Nella libreria multimediale: $(media_count) (attesi 9 foto, 1 video)"
+log "Nella libreria multimediale: $(media_count) (attesi 18 foto, 1 video)"
 
 # 2) Installazione e permessi (concessi in anticipo: il dialogo di sistema non è testabile qui)
 adb install -r "$APK" || { log "❌ Installazione non riuscita"; exit 1; }
@@ -128,9 +128,9 @@ wait_for "trovat" 40 && shot 03-archivio 2
 tap "Avvia" 60
 sleep 5
 shot 04-home-analisi-in-corso
-# attende la fine del riconoscimento (max 3 minuti)
-for _ in $(seq 1 36); do
-  [ -z "$(find_node "Riconoscimento in corso" --any)" ] && [ -z "$(find_node "Da riconoscere" --any)" ] && break
+# attende la fine del riconoscimento (max 5 minuti)
+for _ in $(seq 1 60); do
+  [ -z "$(find_node "Riconoscimento in corso" --any)" ] && [ -z "$(find_node "Da riconoscere" --any)" ] && [ -z "$(find_node "Ricerca dei volti" --any)" ] && break
   sleep 5
 done
 shot 05-home 2
@@ -145,6 +145,50 @@ search "foto%sdi%swhatsapp" 11-cerca-whatsapp
 search "estate%s2023" 12-cerca-estate-2023
 search "Marco%sal%smare" 13-cerca-marco-mare
 search "crea%sun%scarosello%sdel%smare" 14-comando
+
+# 4b) Persone: i ritratti devono formare 3 persone; diamo un nome alla prima e la cerchiamo
+restart
+if tap "Tutte le persone"; then
+  sleep 3
+  shot 14a-persone 1
+  dump
+  PEOPLE=$(python3 - "$OUT/ui.xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+print(sum(1 for n in root.iter("node") if re.fullmatch(r"\d+ foto", n.get("text") or "")))
+PY
+)
+  log "👤 Persone trovate: $PEOPLE (attese 3: Roosevelt 4 foto, Douglass 3, Lincoln 2)"
+  if tap "Aggiungi un nome"; then
+    sleep 3
+    shot 14b-persona 1
+    if tap "Aggiungi un nome"; then
+      wait_for "Come si chiama"
+      tap "class:android.widget.EditText"
+      adb shell input text "Teodoro" </dev/null
+      sleep 1
+      hide_keyboard
+      shot 14c-nome 1
+      tap "Salva"
+      sleep 4
+      shot 14d-persona-con-nome 1
+      [ -n "$(find_node "Teodoro" --any)" ] && log "✅ Nome «Teodoro» assegnato" || { log "❌ Il nome non compare"; FAIL=1; }
+    fi
+  fi
+fi
+restart
+search "Teodoro" 14e-cerca-teodoro
+if tap "IMG_202503"; then
+  sleep 2
+  if tap "Informazioni"; then
+    sleep 2
+    adb shell input swipe 540 1700 540 500 300 </dev/null
+    shot 14f-info-volti 2
+    if tap "Teodoro"; then shot 14g-volto 2; adb shell input keyevent 4 </dev/null; fi
+  fi
+fi
+FACES_LOG=$(adb logcat -d </dev/null | grep -E "FaceRecognizer|FaceIndex" | tail -5)
+[ -n "$FACES_LOG" ] && log "Registro volti: $FACES_LOG"
 
 # 5) Visualizzatore e informazioni
 restart

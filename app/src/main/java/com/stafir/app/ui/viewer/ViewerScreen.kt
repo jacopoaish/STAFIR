@@ -80,11 +80,21 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.text.style.TextOverflow
+import com.stafir.app.ui.common.FaceThumb
+import com.stafir.app.ui.people.FaceCircle
+import com.stafir.app.ui.people.NameDialog
+import com.stafir.core.db.FaceWithPerson
+import com.stafir.core.db.PersonName
 
 /** Visualizzatore a schermo intero: scorri tra le foto, pizzica per ingrandire, tocca per i comandi. */
 @Composable
-fun ViewerScreen(vm: GalleryViewModel, startIndex: Int, onBack: () -> Unit) {
-    val items = vm.paging.collectAsLazyPagingItems()
+fun ViewerScreen(vm: GalleryViewModel, startIndex: Int, onBack: () -> Unit, onPerson: (Long) -> Unit, personId: Long? = null) {
+    val source = remember(personId) { if (personId == null) vm.paging else vm.personPaging(personId) }
+    val items = source.collectAsLazyPagingItems()
     // Aspetta che la lista sia pronta prima di posizionarsi sulla foto scelta
     var ready by remember { mutableStateOf(items.itemCount > startIndex) }
     LaunchedEffect(Unit) {
@@ -97,7 +107,7 @@ fun ViewerScreen(vm: GalleryViewModel, startIndex: Int, onBack: () -> Unit) {
     }
     val pager = rememberPagerState(initialPage = startIndex) { items.itemCount }
     LaunchedEffect(pager) {
-        snapshotFlow { pager.currentPage }.collect { vm.lastViewedIndex = it }
+        snapshotFlow { pager.currentPage }.collect { if (personId == null) vm.lastViewedIndex = it }
     }
     var chrome by remember { mutableStateOf(true) }
     var info by remember { mutableStateOf<MediaEntity?>(null) }
@@ -166,7 +176,7 @@ fun ViewerScreen(vm: GalleryViewModel, startIndex: Int, onBack: () -> Unit) {
             }
         }
     }
-    info?.let { InfoSheet(vm, it, onDismiss = { info = null }) }
+    info?.let { InfoSheet(vm, it, onDismiss = { info = null }, onPerson = { id -> info = null; onPerson(id) }) }
 }
 
 @Composable
@@ -200,10 +210,13 @@ private fun share(ctx: android.content.Context, m: MediaEntity) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun InfoSheet(vm: GalleryViewModel, start: MediaEntity, onDismiss: () -> Unit) {
+private fun InfoSheet(vm: GalleryViewModel, start: MediaEntity, onDismiss: () -> Unit, onPerson: (Long) -> Unit) {
     val ctx = LocalContext.current
     val m by produceState(start, start.id) { value = vm.mediaById(start.id) ?: start }
     val labels by produceState<List<MediaLabelEntity>>(emptyList(), start.id) { value = vm.labelsFor(start.id) }
+    var facesVersion by remember { mutableStateOf(0) }
+    val faces by produceState<List<FaceWithPerson>>(emptyList(), start.id, facesVersion) { value = vm.facesOf(start.id) }
+    var chosenFace by remember { mutableStateOf<FaceWithPerson?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
@@ -226,6 +239,24 @@ private fun InfoSheet(vm: GalleryViewModel, start: MediaEntity, onDismiss: () ->
                     Spacer(Modifier.width(8.dp))
                     Text("Apri sulla mappa")
                 }
+            }
+            if (faces.isNotEmpty()) {
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                Text("Persone", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    faces.forEach { f ->
+                        Column(Modifier.width(76.dp).clickable { chosenFace = f }, horizontalAlignment = Alignment.CenterHorizontally) {
+                            FaceCircle(f.thumb(m), 64)
+                            Text(
+                                f.personName ?: "Senza nome", maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (f.personName == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+                Text("Tocca un volto per dargli un nome o correggerlo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
             when (m.analysisState) {
@@ -259,6 +290,47 @@ private fun InfoSheet(vm: GalleryViewModel, start: MediaEntity, onDismiss: () ->
             }
         }
     }
+    chosenFace?.let { f ->
+        FaceDialog(vm, f, m, onDismiss = { chosenFace = null }, onChanged = { chosenFace = null; facesVersion++ }, onPerson = onPerson)
+    }
+}
+
+private fun FaceWithPerson.thumb(m: MediaEntity) = FaceThumb(m.id, m.isVideo, m.dateModified, frameMs, boxLeft, boxTop, boxRight, boxBottom)
+
+/** Cosa fare con un volto: dargli un nome, correggerlo o vedere tutte le foto della persona. */
+@Composable
+private fun FaceDialog(vm: GalleryViewModel, f: FaceWithPerson, m: MediaEntity, onDismiss: () -> Unit, onChanged: () -> Unit, onPerson: (Long) -> Unit) {
+    var naming by remember { mutableStateOf(false) }
+    val named by produceState(emptyList<PersonName>(), naming) { value = vm.namedPeople() }
+    val who = f.personName
+    if (naming) {
+        NameDialog(
+            initial = null,
+            title = if (who == null) "Come si chiama?" else "Chi è, allora?",
+            existing = named,
+            onDismiss = onDismiss,
+        ) { name -> vm.nameFace(f.id, name) { onChanged() } }
+        return
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { FaceCircle(f.thumb(m), 72) },
+        title = { Text(who ?: "Persona senza nome") },
+        text = {
+            Column {
+                if (who == null) {
+                    TextButton(onClick = { naming = true }) { Text("Dai un nome (vale per tutte le sue foto)") }
+                } else {
+                    TextButton(onClick = { vm.removeFace(f.id); onChanged() }) { Text("Non è $who") }
+                    TextButton(onClick = { naming = true }) { Text("È un'altra persona…") }
+                }
+                f.personId?.let { pid ->
+                    TextButton(onClick = { onDismiss(); onPerson(pid) }) { Text(if (who == null) "Vedi tutte le sue foto" else "Vedi tutte le foto di $who") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Chiudi") } },
+    )
 }
 
 @Composable
