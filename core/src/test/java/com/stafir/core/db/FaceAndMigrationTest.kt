@@ -90,8 +90,20 @@ class FaceAndMigrationTest {
             runBlocking { mediaDao().insertAll(listOf(media(1), media(2))) }
             val w: SupportSQLiteDatabase = openHelper.writableDatabase
             w.execSQL("DROP TABLE face"); w.execSQL("DROP TABLE person")
-            w.execSQL("ALTER TABLE media DROP COLUMN facesVersion")
-            w.version = 2
+            // toglie la colonna facesVersion ricreando la tabella (DROP COLUMN non c'è nelle versioni di SQLite più vecchie)
+            fun strings(sql: String) = w.query(sql).use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
+            val create = strings("SELECT sql FROM sqlite_master WHERE type='table' AND name='media'").single()
+                .replace(Regex(",\\s*`facesVersion`[^,)]*"), "")
+            val indices = strings("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='media' AND sql IS NOT NULL")
+            val cols = w.query("PRAGMA table_info(media)").use { c -> buildList { while (c.moveToNext()) add(c.getString(1)) } }
+                .filter { it != "facesVersion" }.joinToString(", ") { "`$it`" }
+            assertTrue("facesVersion" !in create)
+            w.execSQL("ALTER TABLE media RENAME TO media_old")
+            w.execSQL(create)
+            w.execSQL("INSERT INTO media ($cols) SELECT $cols FROM media_old")
+            w.execSQL("DROP TABLE media_old")
+            indices.forEach { w.execSQL(it) }
+            w.execSQL("PRAGMA user_version = 2")
             close()
         }
         // 2) riapre con la migrazione: Room verifica che la struttura risultante sia identica a quella attesa
