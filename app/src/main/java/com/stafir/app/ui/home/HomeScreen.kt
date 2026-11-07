@@ -4,6 +4,18 @@ import android.app.Activity
 import android.content.Intent
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.material.icons.filled.Deselect
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.VerticalAlignBottom
+import androidx.compose.material.icons.filled.VerticalAlignTop
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.runtime.derivedStateOf
+import com.stafir.domain.SectionLayout
+import kotlinx.coroutines.delay
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -141,6 +153,13 @@ fun HomeScreen(
     val selection by vm.selection.collectAsStateWithLifecycle()
     val settings by vm.settings.values.collectAsStateWithLifecycle()
     val killed by vm.killedBySystem.collectAsStateWithLifecycle()
+    val sections by vm.sections.collectAsStateWithLifecycle()
+    val fullMonths by vm.fullMonths.collectAsStateWithLifecycle()
+    // Intestazioni per mese solo quando i conteggi corrispondono alla griglia (durante un aggiornamento: griglia semplice)
+    val layout = remember(sections, items.itemCount) {
+        if (sections.isNotEmpty() && sections.sumOf { it.count } == items.itemCount) SectionLayout(sections.map { it.count })
+        else SectionLayout.flat(items.itemCount)
+    }
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
@@ -169,7 +188,8 @@ fun HomeScreen(
         val visible = withTimeoutOrNull(1_500) {
             snapshotFlow { gridState.layoutInfo.visibleItemsInfo.map { it.index } }.first { it.isNotEmpty() }
         }
-        if (visible == null || idx !in visible.first()..visible.last()) gridState.scrollToItem(idx)
+        val target = layout.gridOfMedia(idx)
+        if (visible == null || target !in visible.first()..visible.last()) gridState.scrollToItem(target)
     }
 
     val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -191,7 +211,15 @@ fun HomeScreen(
                     title = { Text(Format.plural(selection.size, "selezionato", "selezionati")) },
                     navigationIcon = { IconButton(onClick = { vm.clearSelection() }) { Icon(Icons.Filled.Close, "Annulla") } },
                     actions = {
+                        val all = selection.size >= items.itemCount
+                        IconButton(onClick = { if (all) vm.clearSelection() else vm.selectAll() }) {
+                            Icon(if (all) Icons.Filled.Deselect else Icons.Filled.SelectAll, if (all) "Deseleziona tutto" else "Seleziona tutto")
+                        }
                         IconButton(onClick = {
+                            if (selection.size > MAX_SHARE) {
+                                Toast.makeText(ctx, "Puoi condividere al massimo ${Format.count(MAX_SHARE)} file alla volta", Toast.LENGTH_LONG).show()
+                                return@IconButton
+                            }
                             val uris = ArrayList(vm.selectedUris())
                             val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
                                 type = "*/*"
@@ -201,6 +229,10 @@ fun HomeScreen(
                             ctx.startActivity(Intent.createChooser(send, "Condividi"))
                         }) { Icon(Icons.Filled.Share, "Condividi") }
                         IconButton(onClick = {
+                            if (selection.size > MAX_TRASH) {
+                                Toast.makeText(ctx, "Per sicurezza puoi spostare nel cestino al massimo ${Format.count(MAX_TRASH)} file alla volta", Toast.LENGTH_LONG).show()
+                                return@IconButton
+                            }
                             val pi = MediaStore.createTrashRequest(ctx.contentResolver, vm.selectedUris(), true)
                             trash.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                         }) { Icon(Icons.Filled.Delete, "Sposta nel cestino") }
@@ -297,6 +329,10 @@ fun HomeScreen(
                 MediaGrid(
                     items = items,
                     state = gridState,
+                    layout = layout,
+                    months = sections.map { it.month },
+                    fullMonths = fullMonths,
+                    onToggleMonth = { vm.toggleMonth(it) },
                     columns = settings.gridColumns,
                     selection = selection,
                     onColumnsChange = { vm.settings.setGridColumns(it) },
@@ -374,6 +410,9 @@ private fun FilterRow(vm: GalleryViewModel, onPeople: () -> Unit) {
         }
     }
 }
+
+private const val MAX_SHARE = 500
+private const val MAX_TRASH = 2_000
 
 @Composable
 private fun DropChip(label: String, activeCount: Int, content: @Composable (close: () -> Unit) -> Unit) {
@@ -471,6 +510,10 @@ private fun EmptyState(searching: Boolean, analysis: AnalysisUi) {
 private fun MediaGrid(
     items: LazyPagingItems<MediaEntity>,
     state: LazyGridState,
+    layout: SectionLayout,
+    months: List<String>,
+    fullMonths: Set<String>,
+    onToggleMonth: (String) -> Unit,
     columns: Int,
     selection: Set<Long>,
     onColumnsChange: (Int) -> Unit,
@@ -512,7 +555,8 @@ private fun MediaGrid(
                     }
                 },
         ) {
-            items(count = items.itemCount, key = items.itemKey { it.id }) { index ->
+            val key = items.itemKey { it.id }
+            val cell: @Composable (Int) -> Unit = { index ->
                 val m = items[index]
                 if (m == null) {
                     Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainer))
@@ -531,8 +575,93 @@ private fun MediaGrid(
                     )
                 }
             }
+            if (!layout.headers) {
+                items(count = items.itemCount, key = key, contentType = { "media" }) { index -> cell(index) }
+            } else {
+                for (s in 0 until layout.sectionCount) {
+                    val start = layout.start(s)
+                    val month = months.getOrNull(s) ?: continue
+                    item(key = "mese:$month", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
+                        MonthHeader(
+                            label = Format.monthKey(month),
+                            count = layout.count(s),
+                            selecting = selection.isNotEmpty(),
+                            selected = month in fullMonths,
+                            onToggle = { onToggleMonth(month) },
+                        )
+                    }
+                    items(count = layout.count(s), key = { i -> key(start + i) }, contentType = { "media" }) { i -> cell(start + i) }
+                }
+            }
         }
-        FastScroller(items, state, Modifier.align(Alignment.CenterEnd))
+        val label: (Int) -> String = { grid ->
+            if (layout.headers) months.getOrNull(layout.sectionOfGrid(grid))?.let { Format.monthKey(it) } ?: ""
+            else items.peek(layout.mediaOfGrid(grid).coerceIn(0, (items.itemCount - 1).coerceAtLeast(0)))?.let { Format.monthYear(it.dateTaken) } ?: ""
+        }
+        var dragging by remember { mutableStateOf(false) }
+        MonthPill(state, layout, label, hidden = dragging, modifier = Modifier.align(Alignment.TopCenter))
+        FastScroller(layout.gridCount, state, label, onDragging = { dragging = it }, modifier = Modifier.align(Alignment.CenterEnd))
+        JumpButtons(state, layout.gridCount, Modifier.align(Alignment.BottomEnd).padding(end = if (layout.gridCount >= 200) 44.dp else 16.dp, bottom = 16.dp))
+    }
+}
+
+/** Intestazione di un mese nella griglia; in selezione permette di scegliere tutto il mese. */
+@Composable
+private fun MonthHeader(label: String, count: Int, selecting: Boolean, selected: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).padding(start = 12.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text(Format.count(count), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (selecting) {
+            IconButton(onClick = onToggle) {
+                Icon(
+                    if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                    if (selected) "Deseleziona $label" else "Seleziona tutto $label",
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Spacer(Modifier.width(12.dp))
+        }
+    }
+}
+
+/** Mentre scorri, in alto compare il mese e l'anno che stai guardando. */
+@Composable
+private fun MonthPill(state: LazyGridState, layout: SectionLayout, label: (Int) -> String, hidden: Boolean, modifier: Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isScrollInProgress) {
+        if (state.isScrollInProgress) visible = true else { delay(1_200); visible = false }
+    }
+    val first by remember { derivedStateOf { state.firstVisibleItemIndex } }
+    val text = if (layout.gridCount > 0) label(first) else ""
+    AnimatedVisibility(visible && !hidden && text.isNotEmpty() && first > 0, enter = fadeIn(), exit = fadeOut(), modifier = modifier.padding(top = 8.dp)) {
+        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.inverseSurface, shadowElevation = 4.dp) {
+            Text(text, Modifier.padding(horizontal = 14.dp, vertical = 6.dp), color = MaterialTheme.colorScheme.inverseOnSurface, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/** Pulsanti per saltare subito all'inizio (più recenti) o alla fine (più vecchi). */
+@Composable
+private fun JumpButtons(state: LazyGridState, count: Int, modifier: Modifier) {
+    if (count < 60) return
+    val scope = rememberCoroutineScope()
+    val canUp by remember { derivedStateOf { state.firstVisibleItemIndex > 0 } }
+    val canDown by remember { derivedStateOf { state.canScrollForward } }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
+        AnimatedVisibility(canUp, enter = fadeIn(), exit = fadeOut()) {
+            SmallFloatingActionButton(onClick = { scope.launch { state.scrollToItem(0) } }) {
+                Icon(Icons.Filled.VerticalAlignTop, "Vai all'inizio")
+            }
+        }
+        AnimatedVisibility(canDown, enter = fadeIn(), exit = fadeOut()) {
+            SmallFloatingActionButton(onClick = { scope.launch { state.scrollToItem(count - 1) } }) {
+                Icon(Icons.Filled.VerticalAlignBottom, "Vai alla fine")
+            }
+        }
     }
 }
 
@@ -573,8 +702,7 @@ private fun GridCell(m: MediaEntity, selected: Boolean, selecting: Boolean, modi
 
 /** Barra laterale da trascinare per scorrere velocemente decine di migliaia di elementi, con la data. */
 @Composable
-private fun FastScroller(items: LazyPagingItems<MediaEntity>, state: LazyGridState, modifier: Modifier) {
-    val count = items.itemCount
+private fun FastScroller(count: Int, state: LazyGridState, label: (Int) -> String, onDragging: (Boolean) -> Unit, modifier: Modifier) {
     if (count < 200) return
     val scope = rememberCoroutineScope()
     var size by remember { mutableStateOf(IntSize.Zero) }
@@ -591,9 +719,9 @@ private fun FastScroller(items: LazyPagingItems<MediaEntity>, state: LazyGridSta
             .onSizeChanged { size = it }
             .pointerInput(count) {
                 detectVerticalDragGestures(
-                    onDragStart = { o -> dragging = true; fraction = (o.y / size.height).coerceIn(0f, 1f) },
-                    onDragEnd = { dragging = false },
-                    onDragCancel = { dragging = false },
+                    onDragStart = { o -> dragging = true; onDragging(true); fraction = (o.y / size.height).coerceIn(0f, 1f) },
+                    onDragEnd = { dragging = false; onDragging(false) },
+                    onDragCancel = { dragging = false; onDragging(false) },
                 ) { change, _ ->
                     change.consume()
                     fraction = (change.position.y / size.height).coerceIn(0f, 1f)
@@ -609,7 +737,7 @@ private fun FastScroller(items: LazyPagingItems<MediaEntity>, state: LazyGridSta
         ) {}
         if (dragging) {
             val idx = (fraction * (count - 1)).roundToInt()
-            val label = items.peek(idx)?.let { Format.monthYear(it.dateTaken) } ?: "…"
+            val label = label(idx).ifEmpty { "…" }
             Surface(
                 modifier = Modifier.align(Alignment.TopEnd).offset { IntOffset(-with(density) { 44.dp.roundToPx() }, y) },
                 shape = RoundedCornerShape(16.dp),

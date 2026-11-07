@@ -140,6 +140,16 @@ interface MediaDao {
     @RawQuery
     suspend fun countRaw(query: SupportSQLiteQuery): Int
 
+    @RawQuery
+    suspend fun monthsRaw(query: SupportSQLiteQuery): List<MonthCount>
+
+    @RawQuery
+    suspend fun idsRaw(query: SupportSQLiteQuery): List<IdKind>
+
+    /** Cambia a ogni [bumpUi]: serve per aggiornare le intestazioni dei mesi insieme alla griglia. */
+    @Query("SELECT version FROM ui_version WHERE id = 0")
+    fun uiVersion(): Flow<Long?>
+
     @Query("SELECT * FROM media WHERE id = :id")
     suspend fun byId(id: Long): MediaEntity?
 

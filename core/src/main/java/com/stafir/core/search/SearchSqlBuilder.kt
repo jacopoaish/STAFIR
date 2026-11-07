@@ -64,6 +64,26 @@ object SearchSqlBuilder {
         return SimpleSQLiteQuery("SELECT * FROM media ${w.where} ORDER BY dateTaken DESC, id DESC", w.args.toTypedArray())
     }
 
+    /** Mese di scatto ("2024-08") nel fuso del telefono, come lo mostra la griglia. */
+    const val MONTH = "strftime('%Y-%m', dateTaken / 1000, 'unixepoch', 'localtime')"
+
+    /** Quanti risultati per mese, nello stesso ordine della griglia (dal più recente). */
+    fun months(q: SearchQuery, minConfidence: Float): SimpleSQLiteQuery {
+        val w = where(q, minConfidence)
+        return SimpleSQLiteQuery(
+            "SELECT $MONTH AS month, COUNT(*) AS count FROM media ${w.where} GROUP BY month ORDER BY month DESC",
+            w.args.toTypedArray(),
+        )
+    }
+
+    /** Id e tipo di tutti i risultati, o solo di quelli di un mese ("2024-08"). */
+    fun ids(q: SearchQuery, minConfidence: Float, month: String? = null): SimpleSQLiteQuery {
+        val w = where(q, minConfidence)
+        if (month == null) return SimpleSQLiteQuery("SELECT id, isVideo FROM media ${w.where}", w.args.toTypedArray())
+        val cond = if (w.where.isEmpty()) "WHERE $MONTH = ?" else "${w.where} AND $MONTH = ?"
+        return SimpleSQLiteQuery("SELECT id, isVideo FROM media $cond", (w.args + month).toTypedArray())
+    }
+
     fun count(q: SearchQuery, minConfidence: Float): SimpleSQLiteQuery {
         val w = where(q, minConfidence)
         return SimpleSQLiteQuery("SELECT COUNT(*) FROM media ${w.where}", w.args.toTypedArray())

@@ -37,6 +37,8 @@ Galleria intelligente per Android: gestisce, riconosce, classifica e cerca **tut
 | Correzioni: «non è lui/lei», «è un'altra persona», unisci, nascondi; le correzioni non vengono annullate dall'analisi | ✅ |
 | Ricerca per nome in italiano («Marco al mare nel 2023») e filtro «Persone» | ✅ |
 | Le foto già analizzate in Fase 1 vengono ripassate solo per i volti (in carica) | ✅ |
+| Griglia divisa per mesi, mese e anno mentre scorri, pulsanti «Vai all'inizio / alla fine» | ✅ |
+| Seleziona tutto (anche i file non ancora caricati) e seleziona un mese intero | ✅ |
 
 ## Architettura (moduli separati)
 

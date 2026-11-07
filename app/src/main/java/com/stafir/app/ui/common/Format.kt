@@ -36,6 +36,12 @@ object Format {
     fun dateLong(ms: Long): String = SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", it).format(Date(ms))
         .replaceFirstChar { c -> c.uppercase() }
 
+    /** "2024-08" -> "Agosto 2024". */
+    fun monthKey(key: String): String = runCatching {
+        java.time.YearMonth.parse(key).format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", it))
+            .replaceFirstChar { c -> c.uppercase() }
+    }.getOrDefault(key)
+
     fun monthYear(ms: Long): String = SimpleDateFormat("MMMM yyyy", it).format(Date(ms))
         .replaceFirstChar { c -> c.uppercase() }
 

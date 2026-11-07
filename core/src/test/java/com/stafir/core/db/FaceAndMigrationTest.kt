@@ -81,6 +81,33 @@ class FaceAndMigrationTest {
         db.close()
     }
 
+    /** Intestazioni per mese della griglia e "seleziona tutto / il mese". */
+    @Test fun monthsAndIdsForGrid() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(ctx, StafirDatabase::class.java).allowMainThreadQueries().build()
+        val md = db.mediaDao()
+        fun at(y: Int, m: Int, d: Int) = java.time.LocalDateTime.of(y, m, d, 12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        md.insertAll(
+            listOf(
+                media(1).copy(dateTaken = at(2024, 8, 15)),
+                media(2).copy(dateTaken = at(2024, 7, 10)),
+                media(3).copy(dateTaken = at(2024, 7, 20)),
+                media(4).copy(dateTaken = at(2023, 12, 25), isVideo = true),
+            ),
+        )
+        val all = SearchQuery()
+        assertEquals(
+            listOf(MonthCount("2024-08", 1), MonthCount("2024-07", 2), MonthCount("2023-12", 1)),
+            md.monthsRaw(SearchSqlBuilder.months(all, 0.6f)),
+        )
+        assertEquals(4, md.idsRaw(SearchSqlBuilder.ids(all, 0.6f)).size)
+        assertEquals(setOf(2L, 3L), md.idsRaw(SearchSqlBuilder.ids(all, 0.6f, "2024-07")).map { it.id }.toSet())
+        val videos = SearchQuery(mediaType = com.stafir.domain.MediaTypeFilter.VIDEOS)
+        assertEquals(listOf(MonthCount("2023-12", 1)), md.monthsRaw(SearchSqlBuilder.months(videos, 0.6f)))
+        assertEquals(listOf(IdKind(4, true)), md.idsRaw(SearchSqlBuilder.ids(videos, 0.6f, "2023-12")))
+        assertTrue(md.idsRaw(SearchSqlBuilder.ids(videos, 0.6f, "2024-07")).isEmpty())
+        db.close()
+    }
+
     /** Un database della versione 2 (Fase 1) viene aggiornato senza perdere i file già analizzati. */
     @Test fun migrationFrom2KeepsData() {
         val name = "migr_test.db"

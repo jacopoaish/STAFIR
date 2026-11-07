@@ -18,6 +18,7 @@ import com.stafir.core.db.KindStat
 import com.stafir.core.db.PersonName
 import com.stafir.core.db.PersonWithCover
 import com.stafir.core.db.MediaEntity
+import com.stafir.core.db.MonthCount
 import com.stafir.core.db.StateStat
 import com.stafir.core.search.SearchSqlBuilder
 import com.stafir.domain.Concept
@@ -146,6 +147,13 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
         .cachedIn(viewModelScope)
 
+    /** Quanti file per mese tra i risultati attuali: le intestazioni della griglia. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val sections: StateFlow<List<MonthCount>> = combine(currentQuery, dao.uiVersion()) { q, _ -> q }
+        .mapLatest { q -> dao.monthsRaw(SearchSqlBuilder.months(q, settings.current.minConfidence)) }
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private suspend fun resolve(t: String, c: SearchQuery): SearchQuery {
         val parsed = currentParser().parse(t)
         var q = parsed.mergedWith(c)
@@ -271,18 +279,52 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     private val _selection = MutableStateFlow<Set<Long>>(emptySet())
     val selection: StateFlow<Set<Long>> = _selection.asStateFlow()
     /** Serve per sapere se un id selezionato è un video (per costruire l'URI). */
-    private val selectedKinds = HashMap<Long, Boolean>()
+    private val selectedKinds = java.util.concurrent.ConcurrentHashMap<Long, Boolean>()
+    /** Mesi selezionati per intero dall'intestazione (per mostrare il segno di spunta). */
+    private val _fullMonths = MutableStateFlow<Set<String>>(emptySet())
+    val fullMonths: StateFlow<Set<String>> = _fullMonths.asStateFlow()
 
     fun toggleSelection(m: MediaEntity) {
         val s = _selection.value
-        _selection.value = if (m.id in s) s - m.id else s + m.id
+        if (m.id in s) {
+            _selection.value = s - m.id
+            _fullMonths.value = _fullMonths.value - monthKey(m.dateTaken)
+        } else {
+            _selection.value = s + m.id
+        }
         selectedKinds[m.id] = m.isVideo
     }
 
     fun clearSelection() {
         _selection.value = emptySet()
+        _fullMonths.value = emptySet()
         selectedKinds.clear()
     }
+
+    /** Seleziona tutti i risultati attuali (anche quelli non ancora caricati nella griglia). */
+    fun selectAll() = viewModelScope.launch(Dispatchers.IO) {
+        val rows = dao.idsRaw(SearchSqlBuilder.ids(currentQuery.value, settings.current.minConfidence))
+        rows.forEach { selectedKinds[it.id] = it.isVideo }
+        _selection.value = _selection.value + rows.mapTo(HashSet(rows.size)) { it.id }
+        _fullMonths.value = sections.value.mapTo(HashSet()) { it.month }
+    }
+
+    /** Seleziona (o deseleziona) tutti i file di un mese, dall'intestazione della griglia. */
+    fun toggleMonth(month: String) = viewModelScope.launch(Dispatchers.IO) {
+        val rows = dao.idsRaw(SearchSqlBuilder.ids(currentQuery.value, settings.current.minConfidence, month))
+        val ids = rows.mapTo(HashSet(rows.size)) { it.id }
+        if (month in _fullMonths.value) {
+            _selection.value = _selection.value - ids
+            _fullMonths.value = _fullMonths.value - month
+        } else {
+            rows.forEach { selectedKinds[it.id] = it.isVideo }
+            _selection.value = _selection.value + ids
+            _fullMonths.value = _fullMonths.value + month
+        }
+    }
+
+    private fun monthKey(ms: Long): String =
+        java.time.YearMonth.from(java.time.Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())).toString()
 
     fun selectedUris() = _selection.value.map {
         com.stafir.core.media.MediaStoreSync.contentUri(it, selectedKinds[it] ?: false)

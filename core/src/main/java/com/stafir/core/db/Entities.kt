@@ -164,3 +164,9 @@ data class KindStat(val isVideo: Boolean, val count: Int, val bytes: Long)
 data class StateStat(val analysisState: Int, val count: Int)
 data class ValueCount(val value: String, val count: Int)
 data class SyncKey(val id: Long, val dateModified: Long, val sizeBytes: Long, val isFavorite: Boolean)
+
+/** Quanti file ci sono in un mese ("2024-08") tra i risultati: per le intestazioni della griglia. */
+data class MonthCount(val month: String, val count: Int)
+
+/** Id e tipo di un file (per selezionarne tanti senza caricarli tutti). */
+data class IdKind(val id: Long, val isVideo: Boolean)

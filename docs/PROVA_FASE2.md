@@ -15,5 +15,14 @@
 10. **Video**: anche i volti nei video (3 fotogrammi chiave) finiscono nella persona giusta.
 11. **Privacy**: tutto resta sul telefono. Nel database ci sono solo le «impronte» numeriche dei volti; l'app continua a non avere il permesso internet.
 
+## Novità per scorrere migliaia di file
+12. **Mesi nella griglia**: le foto sono divise da intestazioni come **«Agosto 2024 · 312»**.
+13. **Mentre scorri** compare in alto un'etichetta con **mese e anno** che stai guardando (scompare da sola quando ti fermi).
+14. **Pulsanti in basso a destra**: ⤒ **«Vai all'inizio»** (foto più recenti) e ⤓ **«Vai alla fine»** (le più vecchie), visibili quando hai molti file.
+15. **Barra a destra**: trascinala per saltare tra i mesi (mostra il mese mentre la trascini).
+16. **Seleziona tutto**: tieni premuta una foto → in alto tocca **☑ «Seleziona tutto»** (seleziona anche i file non ancora caricati, rispettando la ricerca o i filtri attivi). Toccalo di nuovo per deselezionare.
+17. **Seleziona un mese**: in selezione, ogni intestazione del mese ha un cerchio a destra che seleziona/deseleziona **tutto quel mese**.
+18. Per sicurezza: condivisione fino a 500 file alla volta, cestino fino a 2.000 (con la conferma di Android).
+
 ## Già presente dalla Fase 1
 Ricerca in italiano (anche a voce), griglia veloce con pizzico, visualizzatore e video, luoghi offline, provenienza (WhatsApp, screenshot…), analisi solo in carica con protezione dal calore, guida HyperOS, «Apri con», banco qualità.

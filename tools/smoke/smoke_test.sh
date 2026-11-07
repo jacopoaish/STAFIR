@@ -201,7 +201,15 @@ fi
 # 6) Selezione multipla (tieni premuto)
 restart
 c=$(find_node "IMG_20240610")
-if [ -n "$c" ]; then adb shell input swipe $c $c 900 </dev/null; sleep 1; shot 18-selezione; fi
+if [ -n "$c" ]; then
+  adb shell input swipe $c $c 900 </dev/null; sleep 1; shot 18-selezione
+  if tap "Seleziona tutto"; then
+    sleep 2
+    shot 18b-seleziona-tutto 1
+    [ -n "$(find_node "19 selezionati" --any)" ] && log "✅ Seleziona tutto: 19 selezionati" || { log "❌ Seleziona tutto non ha selezionato i 19 file"; FAIL=1; }
+    tap "Deseleziona tutto"
+  fi
+fi
 
 # 7) Impostazioni, archivio, avanzate
 restart
@@ -225,6 +233,26 @@ ID=$(adb shell content query --uri content://media/external/images/media --proje
 if [ -n "$ID" ]; then
   adb shell am start -a android.intent.action.VIEW -t image/jpeg -d "content://media/external/images/media/$ID" -n $PKG/.MainActivity </dev/null >/dev/null
   shot 24-apri-con 3
+fi
+
+# 9b) Tanti file: intestazioni dei mesi, mese durante lo scorrimento, pulsanti «inizio/fine»
+adb shell mkdir -p /sdcard/Pictures/Copie </dev/null
+for i in $(seq 1 90); do
+  adb shell cp /sdcard/DCIM/Camera/IMG_20240610_120000.jpg "/sdcard/Pictures/Copie/copia_$i.jpg" </dev/null
+  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/Pictures/Copie/copia_$i.jpg" </dev/null >/dev/null 2>&1
+done
+sleep 5
+restart
+sleep 4
+adb shell input swipe 540 1700 540 900 400 </dev/null
+shot 24b-scorrimento-mese 0
+if tap "Vai alla fine"; then
+  sleep 2
+  shot 24c-fine 0
+  [ -n "$(find_node "Vai all'inizio" --any)" ] && log "✅ Pulsanti «Vai alla fine / all'inizio» presenti" || log "⚠️ Pulsante «Vai all'inizio» non visibile"
+  tap "Vai all'inizio"
+  sleep 2
+  shot 24d-inizio 0
 fi
 
 # 10) Icona nell'elenco delle app del launcher
