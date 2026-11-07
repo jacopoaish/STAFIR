@@ -48,7 +48,8 @@ class AnalysisPipeline(private val container: AppContainer) : AutoCloseable {
         }
     }
 
-    private val faces by lazy { FaceRecognizer(container.context) }
+    private val facesLazy = lazy { FaceRecognizer(container.context) }
+    private val faces by facesLazy
 
     /** true se il riconoscimento volti è attivo e il modello è presente in questa build. */
     fun facesEnabled(s: AppSettings.Values) = s.recognizeFaces && faces.available
@@ -131,7 +132,7 @@ class AnalysisPipeline(private val container: AppContainer) : AutoCloseable {
 
     override fun close() {
         runCatching { scenes.close() }
-        runCatching { faces.close() }
+        if (facesLazy.isInitialized()) runCatching { faces.close() }
     }
 
     companion object {
