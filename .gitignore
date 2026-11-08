@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.kotlin/
+core/src/main/assets/geo/cities.tsv
+ai/src/main/assets/models/

@@ -1,0 +1,216 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body><script type="module">
+import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const Q = new URLSearchParams(location.search);
+const SIZE = +(Q.get('s') || 1600);
+const P = { case: '#8B929C', gold: '#E3B861', dial: ['#123F69', '#04172B'], ink: '#EAF4FF', north: '#E9B95A', eastSteel: '#2D4FC2', west: '#D9DEE5' };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setSize(SIZE, SIZE); renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.3;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+const hdr = await new RGBELoader().loadAsync('hdri/studio.hdr');
+scene.environment = pmrem.fromEquirectangular(hdr).texture;
+const sparkleEnv = pmrem.fromScene(new RoomEnvironment(), 0.0).texture;
+scene.environmentRotation = new THREE.Euler(0.35, 2.4, 0); scene.environmentIntensity = 1.35;
+
+const camera = new THREE.PerspectiveCamera(24, 1, 0.1, 100);
+camera.position.set(0, 12.6, 6.8); camera.lookAt(0, -0.15, -0.55);
+
+const TL = new THREE.TextureLoader();
+const tex = (f, rep = [1, 1], srgb = false) => { const t = TL.load(f); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); t.anisotropy = 16; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+const brushedR = tex('tex/Metal009/Metal009_2K-JPG_Roughness.jpg', [10, 1]);
+const brushedN = tex('tex/Metal009/Metal009_2K-JPG_NormalGL.jpg', [10, 1]);
+const smudgeR = tex('tex/Metal012/Metal012_2K-JPG_Roughness.jpg', [3, 1]);
+await new Promise(r => setTimeout(r, 1500));
+
+const titanium = (rough = .55) => new THREE.MeshPhysicalMaterial({ color: P.case, metalness: 1, roughness: rough, roughnessMap: brushedR, normalMap: brushedN, normalScale: new THREE.Vector2(.25, .25), envMapIntensity: 1.25 });
+const polished = (color, rough = .25) => new THREE.MeshPhysicalMaterial({ color, metalness: 1, roughness: rough, roughnessMap: smudgeR, envMapIntensity: 1.3, clearcoat: .2 });
+const goldM = () => polished(P.gold, .22);
+
+// --- cassa tornita (fianco spazzolato, ghiera lucida) ---
+const side = [[0,-.38],[1.95,-.38],[2.16,-.3],[2.27,-.12],[2.3,.06]].map(([x,y]) => new THREE.Vector2(x,y));
+const top = [[2.3,.06],[2.26,.22],[2.16,.31],[2.0,.33],[1.93,.27],[1.9,.08],[0,.08]].map(([x,y]) => new THREE.Vector2(x,y));
+const caseSide = new THREE.Mesh(new THREE.LatheGeometry(side, 256), titanium(.68)); caseSide.castShadow = caseSide.receiveShadow = true; scene.add(caseSide);
+const bezel = new THREE.Mesh(new THREE.LatheGeometry(top, 256), polished('#A3AAB4', .5)); bezel.castShadow = bezel.receiveShadow = true; scene.add(bezel);
+// zigrinatura
+const knG = new THREE.BoxGeometry(.045, .2, .06), knM = titanium(.5);
+const kn = new THREE.InstancedMesh(knG, knM, 140); const dm = new THREE.Object3D();
+for (let i = 0; i < 140; i++) { const a = i / 140 * Math.PI * 2; dm.position.set(Math.cos(a) * 2.295, .04, Math.sin(a) * 2.295); dm.rotation.set(0, -a, 0); dm.updateMatrix(); kn.setMatrixAt(i, dm.matrix); }
+kn.castShadow = true; scene.add(kn);
+// anello, stelo e corona
+const ring = new THREE.Mesh(new THREE.TorusGeometry(.42, .085, 48, 128), polished(P.case, .28)); ring.position.set(0, 0, -2.92); ring.rotation.x = Math.PI / 2 * .25; ring.castShadow = true; scene.add(ring);
+const stem = new THREE.Mesh(new THREE.CylinderGeometry(.16, .2, .38, 64), titanium(.5)); stem.rotation.x = Math.PI / 2; stem.position.set(0, 0, -2.45); scene.add(stem);
+const crown = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .16, 64), titanium(.62)); crown.rotation.x = Math.PI / 2; crown.position.set(0, 0, -2.58); scene.add(crown);
+// oro: intarsio nella ghiera e filetto sul bordo del quadrante
+const inlay = new THREE.Mesh(new THREE.TorusGeometry(2.08, .018, 24, 512), goldM()); inlay.rotation.x = Math.PI / 2; inlay.position.y = .328; scene.add(inlay);
+const inner = new THREE.Mesh(new THREE.TorusGeometry(1.915, .015, 24, 512), goldM()); inner.rotation.x = Math.PI / 2; inner.position.y = .1; scene.add(inner);
+
+// --- quadrante laccato con raggiera (sunburst) ---
+const TX = 4096; const cv = document.createElement('canvas'); cv.width = cv.height = TX;
+const g = cv.getContext('2d'); g.scale(TX / 2048, TX / 2048); const c = 1024;
+let grd = g.createRadialGradient(c - 160, c - 240, 40, c, c, 1024); grd.addColorStop(0, P.dial[0]); grd.addColorStop(1, P.dial[1]);
+g.fillStyle = grd; g.fillRect(0, 0, 2048, 2048);
+// grana della laccatura
+const id = g.getImageData(0, 0, 2048, 2048); for (let i = 0; i < id.data.length; i += 4) { const n = (Math.random() - .5) * 10; id.data[i] += n; id.data[i + 1] += n; id.data[i + 2] += n; } g.putImageData(id, 0, 0);
+g.strokeStyle = P.gold; g.lineWidth = 4; g.beginPath(); g.arc(c, c, 985, 0, 7); g.stroke();
+g.lineWidth = 2.5; g.beginPath(); g.arc(c, c, 800, 0, 7); g.stroke();
+for (let d = 0; d < 360; d += 2) { const a = (d - 90) * Math.PI / 180, L = d % 10 === 0 ? 70 : 38; g.strokeStyle = P.ink; g.lineWidth = d % 10 === 0 ? 6 : 3; g.beginPath(); g.moveTo(c + Math.cos(a) * 980, c + Math.sin(a) * 980); g.lineTo(c + Math.cos(a) * (980 - L), c + Math.sin(a) * (980 - L)); g.stroke(); }
+g.fillStyle = P.ink; g.font = '600 46px "DejaVu Serif", Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+for (let d = 0; d < 360; d += 30) { if (d % 90 === 0) continue; const a = (d - 90) * Math.PI / 180; g.save(); g.translate(c + Math.cos(a) * 860, c + Math.sin(a) * 860); g.rotate(a + Math.PI / 2); g.fillText(String(d), 0, 0); g.restore(); }
+function pt(ang, L, w, c1, c2) { const a = ang * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+  g.fillStyle = c1; g.beginPath(); g.moveTo(c, c); g.lineTo(c + ux * L, c + uy * L); g.lineTo(c + vx * w, c + vy * w); g.fill();
+  g.fillStyle = c2; g.beginPath(); g.moveTo(c, c); g.lineTo(c + ux * L, c + uy * L); g.lineTo(c - vx * w, c - vy * w); g.fill(); }
+for (const a of [-45, 45, 135, 225]) pt(a, 470, 70, '#BFD9F5', '#5E7FB0');
+for (const a of [-90, 0, 90, 180]) pt(a, 700, 105, '#EEF4FB', '#8EA4C2');
+g.font = 'bold 150px "DejaVu Serif", Georgia, serif';
+for (const [t, x, y, col] of [['N', 0, -795, P.north], ['E', 795, 0, P.ink], ['S', 0, 795, P.ink], ['W', -795, 0, P.ink]]) { g.fillStyle = col; g.fillText(t, c + x, c + y); }
+const dialTex = new THREE.CanvasTexture(cv); dialTex.colorSpace = THREE.SRGBColorSpace; dialTex.anisotropy = 16;
+// mappa di anisotropia radiale = riflesso a raggiera
+const ac = document.createElement('canvas'); ac.width = ac.height = 1024; const ag = ac.getContext('2d'); const ad = ag.createImageData(1024, 1024);
+for (let y = 0; y < 1024; y++) for (let x = 0; x < 1024; x++) { const dx = x - 512, dy = 512 - y, l = Math.hypot(dx, dy) || 1, o = (y * 1024 + x) * 4;
+  ad.data[o] = (dx / l * .5 + .5) * 255; ad.data[o + 1] = (dy / l * .5 + .5) * 255; ad.data[o + 2] = 255; ad.data[o + 3] = 255; }
+ag.putImageData(ad, 0, 0);
+const anisoTex = new THREE.CanvasTexture(ac); anisoTex.colorSpace = THREE.NoColorSpace;
+const dial = new THREE.Mesh(new THREE.CircleGeometry(1.92, 200), new THREE.MeshPhysicalMaterial({
+  map: dialTex, metalness: .55, roughness: .32, anisotropy: .85, anisotropyMap: anisoTex, clearcoat: 1, clearcoatRoughness: .03, envMapIntensity: .8 }));
+dial.rotation.x = -Math.PI / 2; dial.position.y = .085; dial.receiveShadow = true; scene.add(dial);
+
+// --- ago in acciaio: est brunito (blu) con diamante, ovest lucido ---
+const Y = .34;
+function half(east) { const s = new THREE.Shape(); const L = east ? 1.12 : -1.3; s.moveTo(0, -.12); s.lineTo(L, 0); s.lineTo(0, .12); s.lineTo(0, -.12);
+  const m = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: .045, bevelEnabled: true, bevelThickness: .022, bevelSize: .02, bevelSegments: 4 }),
+    east ? new THREE.MeshPhysicalMaterial({ color: P.eastSteel, metalness: 1, roughness: .22, roughnessMap: smudgeR, envMapIntensity: 1.6, iridescence: .35, iridescenceThicknessRange: [300, 500] }) : polished(P.west, .2));
+  m.rotation.x = -Math.PI / 2; m.position.y = Y; m.castShadow = true; return m; }
+scene.add(half(true), half(false));
+const cap = new THREE.Mesh(new THREE.CylinderGeometry(.17, .2, .16, 64), goldM()); cap.position.y = Y + .02; cap.castShadow = true; scene.add(cap);
+const ruby = new THREE.Mesh(new THREE.SphereGeometry(.09, 64, 32), new THREE.MeshPhysicalMaterial({ color: '#B80F33', roughness: .04, metalness: .2, clearcoat: 1, envMapIntensity: 2.2, iridescence: .2 }));
+ruby.position.y = Y + .12; scene.add(ruby);
+// diamanti (brillante: facce a specchio con iridescenza)
+const dmat = new THREE.MeshPhysicalMaterial({ color: '#F4F8FF', metalness: 1, roughness: .01, clearcoat: 1, iridescence: 1, iridescenceIOR: 2.0, iridescenceThicknessRange: [200, 900], envMap: sparkleEnv, envMapIntensity: 3.4, flatShading: true });
+const brill = [[0, .075], [.115, .075], [.15, .062], [.18, .04], [.205, .006], [.205, -.006], [.16, -.05], [.1, -.13], [0, -.235]].map(([x, y]) => new THREE.Vector2(x, y));
+const dmat2 = dmat;
+// --- diamante taglio brillante visto dall'alto: tavola ottagonale, stella, faccette alternate chiare/scure, piccoli "fuochi" colorati ---
+function brilliantTex(seed) {
+  let sd = seed; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const cvs = document.createElement('canvas'); cvs.width = cvs.height = 1024; const x = cvs.getContext('2d'); const c0 = 512, R = 500, T = .56 * R;
+  x.fillStyle = '#05070b'; x.fillRect(0, 0, 1024, 1024);
+  const pal = ['#04060a', '#0d1118', '#2a313b', '#6b7480', '#c9d1db', '#f4f8ff', '#ffffff', '#1a1f27'];
+  const fire = ['#9fd0ff', '#ffd59a', '#d6b4ff', '#a8ffd8', '#ffb3c7'];
+  const shade = () => rnd() < .1 ? fire[Math.floor(rnd() * fire.length)] : pal[Math.floor(rnd() * pal.length)];
+  const P = (r, a) => [c0 + r * Math.cos(a), c0 + r * Math.sin(a)];
+  const tri = (a, b, cc, col) => { x.fillStyle = col; x.beginPath(); x.moveTo(...a); x.lineTo(...b); x.lineTo(...cc); x.closePath(); x.fill(); x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = 2; x.stroke(); };
+  for (let i = 0; i < 16; i++) { // corona: faccette tra tavola e cintura
+    const a0 = i * Math.PI / 8, a1 = (i + 1) * Math.PI / 8, am = (a0 + a1) / 2;
+    const inner0 = P(i % 2 ? T / Math.cos(Math.PI / 8) * Math.cos(Math.PI / 8) : T, a0), inner1 = P((i + 1) % 2 ? T : T, a1);
+    tri(P(T, a0), P(R, a0), P(R * .78, am), shade()); tri(P(T, a0), P(R * .78, am), P(T, a1), shade());
+    tri(P(R * .78, am), P(R, a0), P(R, am), shade()); tri(P(R * .78, am), P(R, am), P(R, a1), shade()); tri(P(T, a1), P(R * .78, am), P(R, a1), shade());
+  }
+  // tavola con il riflesso a "frecce" del padiglione
+  const tg = x.createRadialGradient(c0 - 60, c0 - 80, 10, c0, c0, T); tg.addColorStop(0, '#e9eef6'); tg.addColorStop(1, '#8e98a6');
+  x.fillStyle = tg; x.beginPath(); for (let i = 0; i < 8; i++) { const [px, py] = P(T, i * Math.PI / 4); i ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); x.fill();
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8; tri([c0, c0], P(T * .95, a - .22), P(T * .95, a + .22), rnd() < .5 ? '#11151c' : '#3b434e'); }
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; tri([c0, c0], P(T * .55, a - .3), P(T * .55, a + .3), rnd() < .3 ? fire[Math.floor(rnd() * 5)] : '#f7fbff'); }
+  x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 3; x.beginPath(); x.arc(c0, c0, R, 0, 6.29); x.stroke();
+  const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; return t;
+}
+function brilliantTop(seed) {
+  const g = new THREE.RingGeometry(0.0005, 1, 64, 24); const pa = g.attributes.position;
+  for (let i = 0; i < pa.count; i++) { const r = Math.min(1, Math.hypot(pa.getX(i), pa.getY(i))); pa.setZ(i, r < .56 ? .32 : .32 * (1 - (r - .56) / .44)); }
+  g.rotateX(-Math.PI / 2); g.computeVertexNormals();
+  const tx = brilliantTex(seed);
+  return new THREE.Mesh(g, new THREE.MeshPhysicalMaterial({ map: tx, emissiveMap: tx, emissive: '#ffffff', emissiveIntensity: .75, metalness: .3, roughness: .05, clearcoat: 1, clearcoatRoughness: 0, envMap: sparkleEnv, envMapIntensity: 1.2, iridescence: .6, iridescenceThicknessRange: [200, 800] }));
+}
+function diamond(scale, bez) {
+  if (bez) { const d = new THREE.Group(); const top = brilliantTop(1000 + Math.floor(Math.random() * 1e6)); top.scale.set(.205, .205, .205); d.add(top);
+    const pav = new THREE.Mesh(new THREE.ConeGeometry(.205, .2, 24), new THREE.MeshPhysicalMaterial({ color: '#2a3038', metalness: 1, roughness: .05, envMap: sparkleEnv })); pav.rotation.x = Math.PI; pav.position.y = -.1; d.add(pav);
+    d.scale.setScalar(scale); return d; } const mm = bez ? dmat2 : dmat; const d = new THREE.Group(); d.add(new THREE.Mesh(new THREE.LatheGeometry(brill, 24), mm));
+  const t = new THREE.Mesh(new THREE.CircleGeometry(.115, 8), mm); t.rotation.x = -Math.PI / 2; t.position.y = .0751; d.add(t); d.scale.setScalar(scale); return d; }
+const DX = 1.2;
+// --- zaffiro blu stellato (cabochon con asterismo a 6 raggi) incastonato in oro sulla punta EST ---
+function emeraldColorTex() {
+  const cvs = document.createElement('canvas'); cvs.width = cvs.height = 1024; const x = cvs.getContext('2d');
+  const gr = x.createRadialGradient(470, 440, 20, 512, 512, 512);
+  gr.addColorStop(0, '#A9C1F7'); gr.addColorStop(.3, '#6E8FE0'); gr.addColorStop(.7, '#3F60B8'); gr.addColorStop(1, '#1C2F70');
+  x.fillStyle = gr; x.fillRect(0, 0, 1024, 1024);
+  // "seta": aghi di rutilo orientati a 60°, che nello zaffiro creano la stella e il velo setoso
+  for (let i = 0; i < 4200; i++) {
+    const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 480, px = 512 + Math.cos(a) * r, py = 512 + Math.sin(a) * r;
+    const dir = Math.PI / 2 + Math.floor(Math.random() * 3) * Math.PI / 3, len = 6 + Math.random() * 22;
+    x.strokeStyle = `rgba(225,235,255,${.06 + Math.random() * .11})`; x.lineWidth = 1 + Math.random();
+    x.beginPath(); x.moveTo(px - Math.cos(dir) * len, py - Math.sin(dir) * len); x.lineTo(px + Math.cos(dir) * len, py + Math.sin(dir) * len); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function starTex() {
+  const cvs = document.createElement('canvas'); cvs.width = cvs.height = 1024; const x = cvs.getContext('2d');
+  x.fillStyle = '#000'; x.fillRect(0, 0, 1024, 1024);
+  const glow = x.createRadialGradient(512, 512, 0, 512, 512, 210); glow.addColorStop(0, 'rgba(255,255,255,.95)'); glow.addColorStop(.25, 'rgba(205,220,255,.45)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = glow; x.fillRect(0, 0, 1024, 1024);
+  x.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 3; k++) {
+    x.save(); x.translate(512, 512); x.rotate(Math.PI / 2 + k * Math.PI / 3);
+    for (const [w, a] of [[26, .10], [12, .22], [5, .55], [2, .9]]) {
+      const lg = x.createLinearGradient(-500, 0, 500, 0);
+      lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(.18, `rgba(225,235,255,${a * .5})`); lg.addColorStop(.5, `rgba(255,255,255,${a})`);
+      lg.addColorStop(.82, `rgba(225,235,255,${a * .5})`); lg.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = lg; x.fillRect(-500, -w / 2, 1000, w);
+    }
+    x.restore();
+  }
+  const t = new THREE.CanvasTexture(cvs); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const sapphireColor = emeraldColorTex(), sapphireStar = starTex();
+function starCabochon(RX, RZ, H) {
+  const g = new THREE.RingGeometry(0.0005, 1, 160, 48);
+  const pa = g.attributes.position; for (let i = 0; i < pa.count; i++) { const r = Math.min(1, Math.hypot(pa.getX(i), pa.getY(i))); pa.setZ(i, H * Math.pow(1 - r * r, .62)); }
+  g.rotateX(-Math.PI / 2); g.scale(RX, 1, RZ); g.computeVertexNormals();
+  const stone = new THREE.Mesh(g, new THREE.MeshPhysicalMaterial({
+    map: sapphireColor, emissiveMap: sapphireStar, emissive: '#F4F7FF', emissiveIntensity: 1.25,
+    metalness: 0, roughness: .08, clearcoat: 1, clearcoatRoughness: 0, ior: 1.77, specularIntensity: 1,
+    sheen: 1, sheenRoughness: .3, sheenColor: '#C9D6FF', envMapIntensity: 1.8 }));
+  const grp = new THREE.Group(); grp.add(stone);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1, .9, .06, 96), goldM()); base.scale.set(RX + .025, 1, RZ + .025); base.position.y = -.02; base.castShadow = true; grp.add(base);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1, .07, 24, 160), goldM()); rim.rotation.x = Math.PI / 2; rim.scale.set(RX + .02, RZ + .02, .55); rim.position.y = .012; grp.add(rim);
+  return grp;
+}
+const emG = starCabochon(.12, .095, .085);
+// (nessuna pietra sulla punta dell'ago: lo zaffiro stellato resta solo sulla ghiera a est)
+window.DIAS = [];
+for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, x = Math.sin(a) * 2.08, z = -Math.cos(a) * 2.08;
+  if (i === 2) { const sp = starCabochon(.15, .15, .1); sp.position.set(x, .35, z); scene.add(sp); window.DIAS.push([x, .43, z]); continue; }
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(.13, .1, .045, 48), goldM()); cup.position.set(x, .33, z); cup.castShadow = true; scene.add(cup);
+  for (let k = 0; k < 4; k++) { const pa = a + Math.PI / 4 + k * Math.PI / 2, pr = new THREE.Mesh(new THREE.SphereGeometry(.028, 16, 12), goldM()); pr.position.set(x + Math.cos(pa) * .125, .395, z + Math.sin(pa) * .125); scene.add(pr); }
+  const d = diamond(.68, true); d.position.set(x, .385, z); d.rotation.y = a + Math.PI / 24; scene.add(d); window.DIAS.push([x, .45, z]); }
+// vetro bombato vero (trasmissione + riflessi)
+const glass = new THREE.Mesh(new THREE.SphereGeometry(9, 192, 48, 0, Math.PI * 2, 0, Math.asin(1.93 / 9)),
+  new THREE.MeshPhysicalMaterial({ color: '#ffffff', metalness: 0, roughness: 0, transmission: 1, ior: 1.5, thickness: .06, specularIntensity: 1, envMapIntensity: 1.4 }));
+glass.position.y = .62 - 9; scene.add(glass);
+
+// --- luce chiave per le ombre dell'ago sul quadrante ---
+const key = new THREE.DirectionalLight('#fff1dd', 1.6); key.position.set(-2.2, 7, -10.5); key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096); key.shadow.radius = 10; key.shadow.blurSamples = 24; key.shadow.bias = -0.0004;
+Object.assign(key.shadow.camera, { left: -3.2, right: 3.2, top: 3.4, bottom: -3.4 }); scene.add(key);
+
+
+// --- render con occlusione ambientale ---
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(SIZE, SIZE, { type: THREE.HalfFloatType, samples: 4 }));
+composer.addPass(new RenderPass(scene, camera));
+const ao = new GTAOPass(scene, camera, SIZE, SIZE); ao.blendIntensity = .9; ao.updateGtaoMaterial({ radius: .35, distanceExponent: 1.5, thickness: 1.2, scale: 1 }); composer.addPass(ao);
+composer.addPass(new OutputPass());
+composer.render();
+const proj = ([x, y, z]) => { const q = new THREE.Vector3(x, y, z).project(camera); return [(q.x + 1) / 2 * SIZE, (1 - q.y) / 2 * SIZE]; };
+window.DIA = proj([DX - .15, Y + .12, 0]); window.CENTER = proj([0, .09, 0]); window.DIAS = window.DIAS.map(proj);
+window.DONE = true;
+</script></body></html>

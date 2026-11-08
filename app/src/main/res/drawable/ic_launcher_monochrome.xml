@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Versione monocromatica (icone a tema): cornice della foto, montagne, sole e anello orbitale -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- cornice -->
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M39,35 L69,35 Q76,35 76,42 L76,66 Q76,73 69,73 L39,73 Q32,73 32,66 L32,42 Q32,35 39,35 Z
+                          M40,39.5 Q36.5,39.5 36.5,43 L36.5,65 Q36.5,68.5 40,68.5 L68,68.5 Q71.5,68.5 71.5,65 L71.5,43 Q71.5,39.5 68,39.5 Z" />
+    <!-- montagne -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M36.5,64 L49,49 L56,57 L60,53 L71.5,64 L71.5,65 Q71.5,68.5 68,68.5 L40,68.5 Q36.5,68.5 36.5,65 Z" />
+    <!-- sole -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M62,47 m-4.5,0 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0" />
+    <!-- anello -->
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.2"
+        android:pathData="M25,66 C21,62 40,53 56,48 C72,43 87,41 84,46 C82,49 76,52 70,55" />
+</vector>

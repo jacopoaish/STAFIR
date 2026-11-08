@@ -1,0 +1,34 @@
+package com.stafir.app.indexing
+
+import android.content.Context
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+import com.stafir.app.StafirApp
+
+/**
+ * Si attiva quando cambia la libreria multimediale (anche con l'app chiusa):
+ * aggiorna il database e prenota il riconoscimento dei file nuovi.
+ */
+class NewMediaWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+    override suspend fun doWork(): Result {
+        val container = (applicationContext as StafirApp).container
+        return try {
+            container.mediaSync.sync()
+            val st = container.settings.current
+            val pending = container.database.mediaDao().pendingCount(st.recognizeVideos, if (st.recognizeFaces) AnalysisPipeline.FACES_VERSION else 0)
+            if (pending > 0 && container.settings.current.onboardingDone) {
+                container.scheduler.scheduleAnalysis(now = false)
+            }
+            Result.success()
+        } catch (_: SecurityException) {
+            Result.success()
+        } finally {
+            // I trigger sui contenuti valgono una volta sola: ci si ri-registra.
+            container.scheduler.watchNewMedia(fromWorker = !inputData.getBoolean(KEY_PERIODIC, false))
+        }
+    }
+
+    companion object {
+        const val KEY_PERIODIC = "periodic"
+    }
+}
